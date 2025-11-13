@@ -1,4 +1,4 @@
-module github.com/smithery-ai/mcp-obsidian
+module github.com/nsega/mcp-obsidian
 
 go 1.24.7
 

@@ -16,7 +16,7 @@ This is a Go rewrite of the original [mcp-obsidian](https://github.com/smithery-
 ### From Source
 
 ```bash
-git clone https://github.com/smithery-ai/mcp-obsidian.git
+git clone https://github.com/nsega/mcp-obsidian.git
 cd mcp-obsidian
 go build -o mcp-obsidian .
 ```
@@ -24,7 +24,7 @@ go build -o mcp-obsidian .
 ### Using go install
 
 ```bash
-go install github.com/smithery-ai/mcp-obsidian@latest
+go install github.com/nsega/mcp-obsidian@latest
 ```
 
 ## Usage
