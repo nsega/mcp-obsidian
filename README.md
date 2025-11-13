@@ -126,7 +126,7 @@ go build -o mcp-obsidian .
 
 ## Requirements
 
-- Go 1.21 or later
+- Go 1.24 or later
 - MCP Go SDK v1.1
 
 ## License
