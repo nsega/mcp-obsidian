@@ -2,7 +2,7 @@
 
 A Model Context Protocol (MCP) server for reading and searching Markdown notes in directories like Obsidian vaults.
 
-This is a Go rewrite of the original [mcp-obsidian](https://github.com/smithery-ai/mcp-obsidian) using the [MCP Go SDK v1.1](https://github.com/modelcontextprotocol/go-sdk).
+This is a Go rewrite inspired by [mcp-obsidian](https://github.com/smithery-ai/mcp-obsidian) using the [MCP Go SDK v1.1](https://github.com/modelcontextprotocol/go-sdk).
 
 ## Features
 
