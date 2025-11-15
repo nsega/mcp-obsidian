@@ -124,6 +124,102 @@ The server implements several security measures:
 go build -o mcp-obsidian .
 ```
 
+## Testing Locally
+
+### 1. Create a Test Vault
+
+First, create a test directory with some sample Markdown files:
+
+```bash
+# Create a test vault directory
+mkdir -p ~/test-vault
+
+# Create some sample notes
+echo "# Meeting Notes" > ~/test-vault/meeting.md
+echo "# Project Ideas" > ~/test-vault/project-ideas.md
+echo "# Daily Journal" > ~/test-vault/journal.md
+```
+
+### 2. Build and Run the Server
+
+```bash
+# Build the binary
+go build -o mcp-obsidian .
+
+# Run the server (it will output startup messages to stderr)
+./mcp-obsidian ~/test-vault
+```
+
+The server will start and wait for MCP protocol messages on stdin. You should see:
+```
+MCP Obsidian server starting...
+Vault path: /home/user/test-vault
+```
+
+### 3. Using the MCP Inspector
+
+The easiest way to test your MCP server is using the official MCP Inspector tool:
+
+```bash
+# Install the MCP Inspector
+npx @modelcontextprotocol/inspector mcp-obsidian ~/test-vault
+```
+
+This will:
+1. Start your MCP server
+2. Open a web interface (usually at http://localhost:5173)
+3. Allow you to interactively test the `search_notes` and `read_notes` tools
+4. View the JSON-RPC messages being exchanged
+
+### 4. Manual Testing with JSON-RPC
+
+You can also test manually by sending JSON-RPC messages via stdin. Here's an example:
+
+```bash
+# Start the server
+./mcp-obsidian ~/test-vault
+
+# Then send an initialize request (paste this JSON):
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test-client","version":"1.0.0"}}}
+
+# After initialization, call the search_notes tool:
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"search_notes","arguments":{"query":"meeting"}}}
+```
+
+### 5. Verify in Claude Desktop
+
+After configuring the server in Claude Desktop (see Configuration section above):
+
+1. Restart Claude Desktop
+2. Open the Claude Desktop logs to verify the server started:
+   - **MacOS**: `~/Library/Logs/Claude/mcp*.log`
+   - **Windows**: `%APPDATA%\Claude\logs\mcp*.log`
+3. In a conversation, you should see the tools become available
+4. Try asking: "Search my notes for 'meeting'" or "Read my project-ideas note"
+
+### Troubleshooting
+
+**Server doesn't start:**
+- Verify the vault path exists: `ls ~/test-vault`
+- Check file permissions: `ls -la ~/test-vault`
+- Ensure the binary is executable: `chmod +x mcp-obsidian`
+
+**Tools not appearing in Claude Desktop:**
+- Check the configuration file path is correct
+- Verify the JSON syntax in the config file
+- Restart Claude Desktop after configuration changes
+- Check Claude Desktop logs for error messages
+
+**Permission errors:**
+- Ensure the vault directory is readable
+- Check that you're not trying to access hidden files (those starting with `.`)
+- Verify the path is absolute, not relative
+
+**No results from search:**
+- Verify your vault contains `.md` files
+- Check that the search query matches your filenames
+- Remember that search is case-insensitive and supports regex
+
 ## Requirements
 
 - Go 1.24 or later
