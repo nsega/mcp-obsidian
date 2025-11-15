@@ -22,29 +22,29 @@ var (
 
 // SearchNotesInput defines the input for the search_notes tool
 type SearchNotesInput struct {
-	Query string `json:"query" jsonschema:"required,description=Search query or regex pattern to match note filenames"`
+	Query string `json:"query" jsonschema:"Search query or regex pattern to match note filenames"`
 }
 
 // SearchNotesOutput defines the output for the search_notes tool
 type SearchNotesOutput struct {
-	Results []string `json:"results" jsonschema:"description=List of matching note file paths"`
+	Results []string `json:"results" jsonschema:"List of matching note file paths"`
 }
 
 // ReadNotesInput defines the input for the read_notes tool
 type ReadNotesInput struct {
-	Paths []string `json:"paths" jsonschema:"required,description=Array of file paths to read"`
+	Paths []string `json:"paths" jsonschema:"Array of file paths to read"`
 }
 
 // ReadNotesOutput defines the output for the read_notes tool
 type ReadNotesOutput struct {
-	Notes []NoteContent `json:"notes" jsonschema:"description=Array of note contents"`
+	Notes []NoteContent `json:"notes" jsonschema:"Array of note contents"`
 }
 
 // NoteContent represents a single note's content
 type NoteContent struct {
-	Path    string `json:"path" jsonschema:"description=File path of the note"`
-	Content string `json:"content" jsonschema:"description=Content of the note"`
-	Error   string `json:"error,omitempty" jsonschema:"description=Error message if reading failed"`
+	Path    string `json:"path" jsonschema:"File path of the note"`
+	Content string `json:"content" jsonschema:"Content of the note"`
+	Error   string `json:"error,omitempty" jsonschema:"Error message if reading failed"`
 }
 
 // isPathAllowed checks if a given path is within the allowed vault directory
