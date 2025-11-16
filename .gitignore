@@ -9,6 +9,10 @@
 *.dylib
 mcp-obsidian
 
+# Build artifacts
+build/
+dist/
+
 # Test binary, built with `go test -c`
 *.test
 
@@ -17,6 +21,7 @@ mcp-obsidian
 coverage.*
 *.coverprofile
 profile.cov
+coverage/
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
