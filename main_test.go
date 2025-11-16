@@ -70,6 +70,37 @@ func TestIsPathAllowed(t *testing.T) {
 	vaultPath = tmpVault
 	defer func() { vaultPath = originalVaultPath }()
 
+	// Get home directory for tilde expansion tests
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("Failed to get home directory: %v", err)
+	}
+
+	// Create a test file in home directory for tilde tests
+	homeTestDir := filepath.Join(home, ".test-obsidian-vault")
+	if err := os.MkdirAll(homeTestDir, 0755); err != nil {
+		t.Fatalf("Failed to create home test dir: %v", err)
+	}
+	defer os.RemoveAll(homeTestDir)
+
+	homeTestFile := filepath.Join(homeTestDir, "home-note.md")
+	if err := os.WriteFile(homeTestFile, []byte("test"), 0644); err != nil {
+		t.Fatalf("Failed to create home test file: %v", err)
+	}
+
+	// Create a symlink for symlink tests
+	symlinkSource := filepath.Join(tmpVault, "note1.md")
+	symlinkTarget := filepath.Join(tmpVault, "symlink-note.md")
+	if err := os.Symlink(symlinkSource, symlinkTarget); err != nil {
+		t.Logf("Warning: Failed to create symlink (may not be supported): %v", err)
+	}
+
+	// Create a symlink pointing outside vault
+	outsideSymlinkTarget := filepath.Join(tmpVault, "outside-symlink.md")
+	if err := os.Symlink("/tmp/outside.md", outsideSymlinkTarget); err != nil {
+		t.Logf("Warning: Failed to create outside symlink (may not be supported): %v", err)
+	}
+
 	tests := []struct {
 		name     string
 		path     string
@@ -106,6 +137,26 @@ func TestIsPathAllowed(t *testing.T) {
 			path: filepath.Join(tmpVault, "..", "escape.md"),
 			want: false,
 		},
+		{
+			name: "non-existent file in vault should be allowed",
+			path: filepath.Join(tmpVault, "nonexistent-file.md"),
+			want: true,
+		},
+		{
+			name: "non-existent file outside vault should be rejected",
+			path: "/tmp/nonexistent-outside.md",
+			want: false,
+		},
+		{
+			name: "path with dot segments within vault",
+			path: filepath.Join(tmpVault, "subfolder", "..", "note1.md"),
+			want: true,
+		},
+		{
+			name: "relative path within vault",
+			path: filepath.Join(tmpVault, ".", "note1.md"),
+			want: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -119,6 +170,238 @@ func TestIsPathAllowed(t *testing.T) {
 				t.Errorf("isPathAllowed() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+// TestIsPathAllowedWithTilde tests home directory expansion
+func TestIsPathAllowedWithTilde(t *testing.T) {
+	// Create a test vault in home directory
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("Failed to get home directory: %v", err)
+	}
+
+	homeVault := filepath.Join(home, ".test-obsidian-vault-tilde")
+	if err := os.MkdirAll(homeVault, 0755); err != nil {
+		t.Fatalf("Failed to create home vault: %v", err)
+	}
+	defer os.RemoveAll(homeVault)
+
+	// Create test files
+	testFile := filepath.Join(homeVault, "test-note.md")
+	if err := os.WriteFile(testFile, []byte("test content"), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	// Create hidden file
+	hiddenDir := filepath.Join(homeVault, ".hidden")
+	if err := os.MkdirAll(hiddenDir, 0755); err != nil {
+		t.Fatalf("Failed to create hidden dir: %v", err)
+	}
+	hiddenFile := filepath.Join(hiddenDir, "secret.md")
+	if err := os.WriteFile(hiddenFile, []byte("secret"), 0644); err != nil {
+		t.Fatalf("Failed to create hidden file: %v", err)
+	}
+
+	// Set vault to use tilde path
+	originalVaultPath := vaultPath
+	vaultPath = homeVault
+	defer func() { vaultPath = originalVaultPath }()
+
+	tests := []struct {
+		name    string
+		path    string
+		want    bool
+		wantErr bool
+	}{
+		{
+			name: "tilde path to valid file in vault",
+			path: "~/.test-obsidian-vault-tilde/test-note.md",
+			want: true,
+		},
+		{
+			name: "tilde path to hidden file should be rejected",
+			path: "~/.test-obsidian-vault-tilde/.hidden/secret.md",
+			want: false,
+		},
+		{
+			name: "tilde path to file outside vault",
+			path: "~/.bashrc",
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := isPathAllowed(tt.path)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("isPathAllowed() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("isPathAllowed() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestIsPathAllowedWithTildeVault tests when vault path itself uses tilde expansion
+// Note: In production, main() expands vaultPath before isPathAllowed is called,
+// so we simulate that behavior here by expanding vaultPath manually
+func TestIsPathAllowedWithTildeVault(t *testing.T) {
+	// Create a test vault in home directory
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("Failed to get home directory: %v", err)
+	}
+
+	homeVault := filepath.Join(home, ".test-obsidian-vault-tilde2")
+	if err := os.MkdirAll(homeVault, 0755); err != nil {
+		t.Fatalf("Failed to create home vault: %v", err)
+	}
+	defer os.RemoveAll(homeVault)
+
+	// Create test files
+	testFile := filepath.Join(homeVault, "test-note.md")
+	if err := os.WriteFile(testFile, []byte("test content"), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	subdir := filepath.Join(homeVault, "subdir")
+	if err := os.MkdirAll(subdir, 0755); err != nil {
+		t.Fatalf("Failed to create subdir: %v", err)
+	}
+
+	subdirFile := filepath.Join(subdir, "nested.md")
+	if err := os.WriteFile(subdirFile, []byte("nested content"), 0644); err != nil {
+		t.Fatalf("Failed to create nested file: %v", err)
+	}
+
+	// Set vault path (simulating main() which would have already expanded tilde)
+	// In production, main() expands ~ before setting vaultPath
+	originalVaultPath := vaultPath
+	vaultPath = homeVault // Use expanded path, as main() does
+	defer func() { vaultPath = originalVaultPath }()
+
+	tests := []struct {
+		name    string
+		path    string
+		want    bool
+		wantErr bool
+	}{
+		{
+			name: "absolute path to file in vault that was originally tilde path",
+			path: testFile,
+			want: true,
+		},
+		{
+			name: "absolute path to nested file in vault",
+			path: subdirFile,
+			want: true,
+		},
+		{
+			name: "tilde path to file in vault",
+			path: "~/.test-obsidian-vault-tilde2/test-note.md",
+			want: true,
+		},
+		{
+			name: "path outside vault",
+			path: "~/.bashrc",
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := isPathAllowed(tt.path)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("isPathAllowed() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("isPathAllowed() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestIsPathAllowedWithNonExistentVault tests behavior with non-existent vault
+func TestIsPathAllowedWithNonExistentVault(t *testing.T) {
+	// Set vault to a non-existent directory
+	originalVaultPath := vaultPath
+	vaultPath = "/tmp/nonexistent-vault-path-12345"
+	defer func() { vaultPath = originalVaultPath }()
+
+	// Test with a file path when vault doesn't exist
+	testPath := filepath.Join(vaultPath, "test.md")
+	allowed, err := isPathAllowed(testPath)
+
+	// Should not error (vault non-existence is handled)
+	if err != nil {
+		t.Errorf("isPathAllowed() unexpected error with non-existent vault: %v", err)
+	}
+
+	// Should allow since path would be within vault if it existed
+	if !allowed {
+		t.Error("isPathAllowed() should allow path within non-existent vault")
+	}
+
+	// Test with a path outside the non-existent vault
+	outsidePath := "/tmp/outside.md"
+	allowed, err = isPathAllowed(outsidePath)
+	if err != nil {
+		t.Errorf("isPathAllowed() unexpected error: %v", err)
+	}
+	if allowed {
+		t.Error("isPathAllowed() should reject path outside vault")
+	}
+}
+
+// TestIsPathAllowedWithSymlinks tests symlink handling
+func TestIsPathAllowedWithSymlinks(t *testing.T) {
+	tmpVault := setupTestVault(t)
+	defer cleanupTestVault(t, tmpVault)
+
+	// Set global vaultPath for testing
+	originalVaultPath := vaultPath
+	vaultPath = tmpVault
+	defer func() { vaultPath = originalVaultPath }()
+
+	// Create a symlink to a valid file within vault
+	symlinkSource := filepath.Join(tmpVault, "note1.md")
+	symlinkTarget := filepath.Join(tmpVault, "symlink-to-note.md")
+	if err := os.Symlink(symlinkSource, symlinkTarget); err != nil {
+		t.Skipf("Symlinks not supported on this system: %v", err)
+	}
+
+	// Test that symlink to file within vault is allowed
+	allowed, err := isPathAllowed(symlinkTarget)
+	if err != nil {
+		t.Errorf("isPathAllowed() unexpected error: %v", err)
+	}
+	if !allowed {
+		t.Error("isPathAllowed() should allow symlink to file within vault")
+	}
+
+	// Create symlink pointing outside vault
+	outsideFile := filepath.Join(os.TempDir(), "outside-vault-file.md")
+	if err := os.WriteFile(outsideFile, []byte("outside"), 0644); err != nil {
+		t.Fatalf("Failed to create outside file: %v", err)
+	}
+	defer os.Remove(outsideFile)
+
+	outsideSymlink := filepath.Join(tmpVault, "symlink-outside.md")
+	if err := os.Symlink(outsideFile, outsideSymlink); err != nil {
+		t.Skipf("Cannot create symlink: %v", err)
+	}
+
+	// Test that symlink pointing outside vault is rejected
+	allowed, err = isPathAllowed(outsideSymlink)
+	if err != nil {
+		t.Errorf("isPathAllowed() unexpected error: %v", err)
+	}
+	if allowed {
+		t.Error("isPathAllowed() should reject symlink pointing outside vault")
 	}
 }
 
