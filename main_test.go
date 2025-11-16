@@ -398,8 +398,8 @@ func TestSearchNotesHandler(t *testing.T) {
 	tests := []struct {
 		wantContains    []string
 		wantNotContains []string
-		input           SearchNotesInput
 		name            string
+		input           SearchNotesInput
 		wantCount       int
 		wantErr         bool
 	}{
@@ -585,8 +585,8 @@ func TestReadNotesHandler(t *testing.T) {
 	defer func() { vaultPath = originalVaultPath }()
 
 	tests := []struct {
-		input     ReadNotesInput
 		validate  func(t *testing.T, output ReadNotesOutput)
+		input     ReadNotesInput
 		name      string
 		wantCount int
 	}{
