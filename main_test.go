@@ -78,34 +78,38 @@ func TestIsPathAllowed(t *testing.T) {
 
 	// Create a test file in home directory for tilde tests
 	homeTestDir := filepath.Join(home, ".test-obsidian-vault")
-	if err := os.MkdirAll(homeTestDir, 0755); err != nil {
+	err = os.MkdirAll(homeTestDir, 0755)
+	if err != nil {
 		t.Fatalf("Failed to create home test dir: %v", err)
 	}
 	defer os.RemoveAll(homeTestDir)
 
 	homeTestFile := filepath.Join(homeTestDir, "home-note.md")
-	if err := os.WriteFile(homeTestFile, []byte("test"), 0644); err != nil {
+	err = os.WriteFile(homeTestFile, []byte("test"), 0644)
+	if err != nil {
 		t.Fatalf("Failed to create home test file: %v", err)
 	}
 
 	// Create a symlink for symlink tests
 	symlinkSource := filepath.Join(tmpVault, "note1.md")
 	symlinkTarget := filepath.Join(tmpVault, "symlink-note.md")
-	if err := os.Symlink(symlinkSource, symlinkTarget); err != nil {
+	err = os.Symlink(symlinkSource, symlinkTarget)
+	if err != nil {
 		t.Logf("Warning: Failed to create symlink (may not be supported): %v", err)
 	}
 
 	// Create a symlink pointing outside vault
 	outsideSymlinkTarget := filepath.Join(tmpVault, "outside-symlink.md")
-	if err := os.Symlink("/tmp/outside.md", outsideSymlinkTarget); err != nil {
+	err = os.Symlink("/tmp/outside.md", outsideSymlinkTarget)
+	if err != nil {
 		t.Logf("Warning: Failed to create outside symlink (may not be supported): %v", err)
 	}
 
 	tests := []struct {
-		name     string
-		path     string
-		want     bool
-		wantErr  bool
+		name    string
+		path    string
+		want    bool
+		wantErr bool
 	}{
 		{
 			name: "valid file in vault",
@@ -370,7 +374,8 @@ func TestIsPathAllowedWithSymlinks(t *testing.T) {
 	// Create a symlink to a valid file within vault
 	symlinkSource := filepath.Join(tmpVault, "note1.md")
 	symlinkTarget := filepath.Join(tmpVault, "symlink-to-note.md")
-	if err := os.Symlink(symlinkSource, symlinkTarget); err != nil {
+	err := os.Symlink(symlinkSource, symlinkTarget)
+	if err != nil {
 		t.Skipf("Symlinks not supported on this system: %v", err)
 	}
 
@@ -385,13 +390,15 @@ func TestIsPathAllowedWithSymlinks(t *testing.T) {
 
 	// Create symlink pointing outside vault
 	outsideFile := filepath.Join(os.TempDir(), "outside-vault-file.md")
-	if err := os.WriteFile(outsideFile, []byte("outside"), 0644); err != nil {
+	err = os.WriteFile(outsideFile, []byte("outside"), 0644)
+	if err != nil {
 		t.Fatalf("Failed to create outside file: %v", err)
 	}
 	defer os.Remove(outsideFile)
 
 	outsideSymlink := filepath.Join(tmpVault, "symlink-outside.md")
-	if err := os.Symlink(outsideFile, outsideSymlink); err != nil {
+	err = os.Symlink(outsideFile, outsideSymlink)
+	if err != nil {
 		t.Skipf("Cannot create symlink: %v", err)
 	}
 
@@ -416,12 +423,12 @@ func TestSearchNotesHandler(t *testing.T) {
 	defer func() { vaultPath = originalVaultPath }()
 
 	tests := []struct {
-		name          string
-		input         SearchNotesInput
-		wantCount     int
-		wantContains  []string
+		name            string
+		wantContains    []string
 		wantNotContains []string
-		wantErr       bool
+		input           SearchNotesInput
+		wantCount       int
+		wantErr         bool
 	}{
 		{
 			name: "search for 'note' should find multiple files",
@@ -607,8 +614,8 @@ func TestReadNotesHandler(t *testing.T) {
 	tests := []struct {
 		name      string
 		input     ReadNotesInput
-		wantCount int
 		validate  func(t *testing.T, output ReadNotesOutput)
+		wantCount int
 	}{
 		{
 			name: "read single file successfully",
@@ -714,8 +721,8 @@ func TestReadNotesHandler(t *testing.T) {
 			name: "read mixed valid and invalid files",
 			input: ReadNotesInput{
 				Paths: []string{
-					filepath.Join(tmpVault, "note1.md"),           // valid
-					filepath.Join(tmpVault, "nonexistent.md"),     // invalid - doesn't exist
+					filepath.Join(tmpVault, "note1.md"),             // valid
+					filepath.Join(tmpVault, "nonexistent.md"),       // invalid - doesn't exist
 					filepath.Join(tmpVault, ".hidden", "secret.md"), // invalid - hidden
 				},
 			},

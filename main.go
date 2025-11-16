@@ -205,7 +205,7 @@ func searchNotesHandler(ctx context.Context, req *mcp.CallToolRequest, input Sea
 
 // readNotesHandler implements the read_notes tool
 func readNotesHandler(ctx context.Context, req *mcp.CallToolRequest, input ReadNotesInput) (*mcp.CallToolResult, ReadNotesOutput, error) {
-	var notes []NoteContent
+	notes := make([]NoteContent, 0, len(input.Paths))
 
 	for _, path := range input.Paths {
 		note := NoteContent{
