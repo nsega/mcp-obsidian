@@ -70,41 +70,6 @@ func TestIsPathAllowed(t *testing.T) {
 	vaultPath = tmpVault
 	defer func() { vaultPath = originalVaultPath }()
 
-	// Get home directory for tilde expansion tests
-	home, err := os.UserHomeDir()
-	if err != nil {
-		t.Fatalf("Failed to get home directory: %v", err)
-	}
-
-	// Create a test file in home directory for tilde tests
-	homeTestDir := filepath.Join(home, ".test-obsidian-vault")
-	err = os.MkdirAll(homeTestDir, 0755)
-	if err != nil {
-		t.Fatalf("Failed to create home test dir: %v", err)
-	}
-	defer os.RemoveAll(homeTestDir)
-
-	homeTestFile := filepath.Join(homeTestDir, "home-note.md")
-	err = os.WriteFile(homeTestFile, []byte("test"), 0644)
-	if err != nil {
-		t.Fatalf("Failed to create home test file: %v", err)
-	}
-
-	// Create a symlink for symlink tests
-	symlinkSource := filepath.Join(tmpVault, "note1.md")
-	symlinkTarget := filepath.Join(tmpVault, "symlink-note.md")
-	err = os.Symlink(symlinkSource, symlinkTarget)
-	if err != nil {
-		t.Logf("Warning: Failed to create symlink (may not be supported): %v", err)
-	}
-
-	// Create a symlink pointing outside vault
-	outsideSymlinkTarget := filepath.Join(tmpVault, "outside-symlink.md")
-	err = os.Symlink("/tmp/outside.md", outsideSymlinkTarget)
-	if err != nil {
-		t.Logf("Warning: Failed to create outside symlink (may not be supported): %v", err)
-	}
-
 	tests := []struct {
 		name    string
 		path    string
@@ -186,24 +151,28 @@ func TestIsPathAllowedWithTilde(t *testing.T) {
 	}
 
 	homeVault := filepath.Join(home, ".test-obsidian-vault-tilde")
-	if err := os.MkdirAll(homeVault, 0755); err != nil {
+	err = os.MkdirAll(homeVault, 0755)
+	if err != nil {
 		t.Fatalf("Failed to create home vault: %v", err)
 	}
 	defer os.RemoveAll(homeVault)
 
 	// Create test files
 	testFile := filepath.Join(homeVault, "test-note.md")
-	if err := os.WriteFile(testFile, []byte("test content"), 0644); err != nil {
+	err = os.WriteFile(testFile, []byte("test content"), 0644)
+	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
 	// Create hidden file
 	hiddenDir := filepath.Join(homeVault, ".hidden")
-	if err := os.MkdirAll(hiddenDir, 0755); err != nil {
+	err = os.MkdirAll(hiddenDir, 0755)
+	if err != nil {
 		t.Fatalf("Failed to create hidden dir: %v", err)
 	}
 	hiddenFile := filepath.Join(hiddenDir, "secret.md")
-	if err := os.WriteFile(hiddenFile, []byte("secret"), 0644); err != nil {
+	err = os.WriteFile(hiddenFile, []byte("secret"), 0644)
+	if err != nil {
 		t.Fatalf("Failed to create hidden file: %v", err)
 	}
 
@@ -260,24 +229,28 @@ func TestIsPathAllowedWithTildeVault(t *testing.T) {
 	}
 
 	homeVault := filepath.Join(home, ".test-obsidian-vault-tilde2")
-	if err := os.MkdirAll(homeVault, 0755); err != nil {
+	err = os.MkdirAll(homeVault, 0755)
+	if err != nil {
 		t.Fatalf("Failed to create home vault: %v", err)
 	}
 	defer os.RemoveAll(homeVault)
 
 	// Create test files
 	testFile := filepath.Join(homeVault, "test-note.md")
-	if err := os.WriteFile(testFile, []byte("test content"), 0644); err != nil {
+	err = os.WriteFile(testFile, []byte("test content"), 0644)
+	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
 	subdir := filepath.Join(homeVault, "subdir")
-	if err := os.MkdirAll(subdir, 0755); err != nil {
+	err = os.MkdirAll(subdir, 0755)
+	if err != nil {
 		t.Fatalf("Failed to create subdir: %v", err)
 	}
 
 	subdirFile := filepath.Join(subdir, "nested.md")
-	if err := os.WriteFile(subdirFile, []byte("nested content"), 0644); err != nil {
+	err = os.WriteFile(subdirFile, []byte("nested content"), 0644)
+	if err != nil {
 		t.Fatalf("Failed to create nested file: %v", err)
 	}
 
@@ -423,10 +396,10 @@ func TestSearchNotesHandler(t *testing.T) {
 	defer func() { vaultPath = originalVaultPath }()
 
 	tests := []struct {
-		name            string
 		wantContains    []string
 		wantNotContains []string
 		input           SearchNotesInput
+		name            string
 		wantCount       int
 		wantErr         bool
 	}{
@@ -612,9 +585,9 @@ func TestReadNotesHandler(t *testing.T) {
 	defer func() { vaultPath = originalVaultPath }()
 
 	tests := []struct {
-		name      string
 		input     ReadNotesInput
 		validate  func(t *testing.T, output ReadNotesOutput)
+		name      string
 		wantCount int
 	}{
 		{
