@@ -217,6 +217,7 @@ func TestIsPathAllowedWithTilde(t *testing.T) {
 		})
 	}
 }
+
 // Note: In production, main() expands vaultPath before isPathAllowed is called,
 // so we simulate that behavior here by expanding vaultPath manually
 func TestIsPathAllowedWithTildeVault(t *testing.T) {
