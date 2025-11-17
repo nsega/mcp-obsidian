@@ -1,0 +1,36 @@
+version: 2
+
+linters:
+  # Enable specific linters instead of using defaults
+  # This avoids deprecated linters like exportloopref
+  disable-all: true
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - unused
+    - ineffassign
+    - misspell
+    - prealloc
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+
+linters-settings:
+  govet:
+    enable:
+      - shadow
+      - fieldalignment
+  errcheck:
+    check-blank: true
+
+issues:
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+run:
+  timeout: 5m
+  go: '1.24'
