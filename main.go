@@ -138,8 +138,8 @@ func searchNotesHandler(ctx context.Context, req *mcp.CallToolRequest, input Sea
 		// Skip directories
 		if info.IsDir() {
 			// Check if directory is allowed (not hidden)
-			allowed, err := isPathAllowed(path)
-			if err != nil || !allowed {
+			allowed, checkErr := isPathAllowed(path)
+			if checkErr != nil || !allowed {
 				return filepath.SkipDir
 			}
 			return nil
@@ -151,8 +151,8 @@ func searchNotesHandler(ctx context.Context, req *mcp.CallToolRequest, input Sea
 		}
 
 		// Check if file is allowed
-		allowed, err := isPathAllowed(path)
-		if err != nil || !allowed {
+		allowed, checkErr := isPathAllowed(path)
+		if checkErr != nil || !allowed {
 			return nil
 		}
 
@@ -205,7 +205,7 @@ func searchNotesHandler(ctx context.Context, req *mcp.CallToolRequest, input Sea
 
 // readNotesHandler implements the read_notes tool
 func readNotesHandler(ctx context.Context, req *mcp.CallToolRequest, input ReadNotesInput) (*mcp.CallToolResult, ReadNotesOutput, error) {
-	var notes []NoteContent
+	notes := make([]NoteContent, 0, len(input.Paths))
 
 	for _, path := range input.Paths {
 		note := NoteContent{
