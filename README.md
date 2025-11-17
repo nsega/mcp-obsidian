@@ -1,4 +1,4 @@
-# mcp-obsidian (Go Edition)
+# mcp-obsidian
 
 A Model Context Protocol (MCP) server for reading and searching Markdown notes in directories like Obsidian vaults.
 
