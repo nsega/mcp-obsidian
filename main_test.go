@@ -206,9 +206,9 @@ func TestIsPathAllowedWithTilde(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := isPathAllowed(tt.path)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("isPathAllowed() error = %v, wantErr %v", err, tt.wantErr)
+			got, testErr := isPathAllowed(tt.path)
+			if (testErr != nil) != tt.wantErr {
+				t.Errorf("isPathAllowed() error = %v, wantErr %v", testErr, tt.wantErr)
 				return
 			}
 			if got != tt.want {
@@ -217,8 +217,6 @@ func TestIsPathAllowedWithTilde(t *testing.T) {
 		})
 	}
 }
-
-// TestIsPathAllowedWithTildeVault tests when vault path itself uses tilde expansion
 // Note: In production, main() expands vaultPath before isPathAllowed is called,
 // so we simulate that behavior here by expanding vaultPath manually
 func TestIsPathAllowedWithTildeVault(t *testing.T) {
@@ -290,9 +288,9 @@ func TestIsPathAllowedWithTildeVault(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := isPathAllowed(tt.path)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("isPathAllowed() error = %v, wantErr %v", err, tt.wantErr)
+			got, testErr := isPathAllowed(tt.path)
+			if (testErr != nil) != tt.wantErr {
+				t.Errorf("isPathAllowed() error = %v, wantErr %v", testErr, tt.wantErr)
 				return
 			}
 			if got != tt.want {
