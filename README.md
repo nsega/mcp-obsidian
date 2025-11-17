@@ -227,7 +227,7 @@ After configuring the server in Claude Desktop (see Configuration section above)
 
 ## License
 
-AGPL-3.0
+MIT
 
 ## Contributing
 
