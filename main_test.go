@@ -155,7 +155,7 @@ func TestIsPathAllowedWithTilde(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create home vault: %v", err)
 	}
-	defer os.RemoveAll(homeVault)
+	defer func() { _ = os.RemoveAll(homeVault) }()
 
 	// Create test files
 	testFile := filepath.Join(homeVault, "test-note.md")
@@ -232,7 +232,7 @@ func TestIsPathAllowedWithTildeVault(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create home vault: %v", err)
 	}
-	defer os.RemoveAll(homeVault)
+	defer func() { _ = os.RemoveAll(homeVault) }()
 
 	// Create test files
 	testFile := filepath.Join(homeVault, "test-note.md")
@@ -366,7 +366,7 @@ func TestIsPathAllowedWithSymlinks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create outside file: %v", err)
 	}
-	defer os.Remove(outsideFile)
+	defer func() { _ = os.Remove(outsideFile) }()
 
 	outsideSymlink := filepath.Join(tmpVault, "symlink-outside.md")
 	err = os.Symlink(outsideFile, outsideSymlink)
