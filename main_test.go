@@ -130,9 +130,9 @@ func TestIsPathAllowed(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := isPathAllowed(tt.path)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("isPathAllowed() error = %v, wantErr %v", err, tt.wantErr)
+			got, testErr := isPathAllowed(tt.path)
+			if (testErr != nil) != tt.wantErr {
+				t.Errorf("isPathAllowed() error = %v, wantErr %v", testErr, tt.wantErr)
 				return
 			}
 			if got != tt.want {
