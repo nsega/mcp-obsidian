@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go-version: ['1.24', '1.25']
+        go-version: ['1.24.7', '1.25.4']
 
     steps:
     - name: Check out code
@@ -47,7 +47,7 @@ jobs:
       run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
 
     - name: Upload coverage to Codecov
-      if: matrix.go-version == '1.25'
+      if: matrix.go-version == '1.25.4'
       uses: codecov/codecov-action@v4
       with:
         files: ./coverage.out
@@ -58,7 +58,7 @@ jobs:
       run: go vet ./...
 
     - name: Run staticcheck
-      if: matrix.go-version == '1.25'
+      if: matrix.go-version == '1.25.4'
       run: |
         go install honnef.co/go/tools/cmd/staticcheck@latest
         staticcheck ./...
@@ -74,7 +74,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.25'
+        go-version: '1.25.4'
 
     - name: golangci-lint
       uses: golangci/golangci-lint-action@v8
