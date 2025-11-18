@@ -10,6 +10,9 @@ jobs:
   test:
     name: Build and Test
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: ['1.25']
 
     steps:
     - name: Check out code
@@ -18,7 +21,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.25.4'
+        go-version: ${{ matrix.go-version }}
 
     - name: Cache Go modules
       uses: actions/cache@v4
@@ -26,9 +29,9 @@ jobs:
         path: |
           ~/go/pkg/mod
           ~/.cache/go-build
-        key: ${{ runner.os }}-go-1.25.4-${{ hashFiles('**/go.sum') }}
+        key: ${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}
         restore-keys: |
-          ${{ runner.os }}-go-1.25.4-
+          ${{ runner.os }}-go-${{ matrix.go-version }}-
           ${{ runner.os }}-go-
 
     - name: Download dependencies
@@ -69,7 +72,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.25.4'
+        go-version: '1.25'
 
     - name: golangci-lint
       uses: golangci/golangci-lint-action@v8
