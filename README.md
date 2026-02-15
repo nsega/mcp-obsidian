@@ -1,5 +1,8 @@
 # mcp-obsidian
 
+[![Go Version](https://img.shields.io/github/go-mod/go-version/nsega/mcp-obsidian)](https://go.dev/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A Model Context Protocol (MCP) server for managing Markdown notes in Obsidian vaults with full Zettelkasten workflow support.
 
 This is a Go rewrite inspired by [mcp-obsidian](https://github.com/smithery-ai/mcp-obsidian) using the [MCP Go SDK v1.3](https://github.com/modelcontextprotocol/go-sdk).
