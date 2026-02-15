@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -24,14 +25,17 @@ func setupTestVault(t *testing.T) string {
 	// Create test directory structure
 	testFiles := map[string]string{
 		"note1.md":                    "# Note 1\nThis is the first note.",
-		"note2.md":                    "# Note 2\nThis is the second note.",
-		"project-plan.md":             "# Project Plan\nProject planning document.",
+		"note2.md":                    "# Note 2\nThis is the second note.\nSee also [[note1]] for details.",
+		"project-plan.md":             "# Project Plan\nProject planning document.\nRelated: [[note1|first note]]",
 		"daily-journal.md":            "# Daily Journal\nJournal entries.",
-		"subfolder/nested-note.md":    "# Nested Note\nNote in subfolder.",
+		"subfolder/nested-note.md":    "# Nested Note\nNote in subfolder.\nLinks to [[project-plan]].",
 		"subfolder/project-update.md": "# Project Update\nUpdate in subfolder.",
 		".hidden/secret.md":           "# Secret\nHidden file.",
 		"subfolder/.hidden-note.md":   "# Hidden Note\nHidden file in subfolder.",
 		"not-markdown.txt":            "This is a text file, not markdown.",
+		"30_Permanent/zettel1.md":     "---\ntags:\n  - zettelkasten\n  - productivity\ncreated: 2026-01-01\nupdated: 2026-01-01\n---\n\n# Zettel 1\nA permanent note about #workflow and #productivity.",
+		"30_Permanent/zettel2.md":     "---\ntags: [zettelkasten, reading]\ncreated: 2026-01-15\nupdated: 2026-01-15\n---\n\n# Zettel 2\nAnother note with #reading tag.\nSee [[zettel1]] for context.",
+		"10_FleetingNote/fleeting.md": "---\ntags:\n  - fleeting\ncreated: 2026-02-01\nupdated: 2026-02-01\n---\n\n# Fleeting Thought\nQuick capture with #idea tag.",
 	}
 
 	for path, content := range testFiles {
@@ -825,5 +829,627 @@ func TestReadNotesContentFormat(t *testing.T) {
 	}
 	if !strings.Contains(textContent.Text, "note2.md") {
 		t.Error("Expected text content to mention note2.md")
+	}
+}
+
+// TestSlugify tests the slugify helper function
+func TestSlugify(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"Hello World", "hello-world"},
+		{"GTD Zettelkasten Flowchart", "gtd-zettelkasten-flowchart"},
+		{"  spaces  everywhere  ", "spaces-everywhere"},
+		{"special!@#chars$%^&*()", "special-chars"},
+		{"already-slugified", "already-slugified"},
+		{"UPPERCASE", "uppercase"},
+		{"multiple---hyphens", "multiple-hyphens"},
+		{"日本語テスト", "日本語テスト"},
+		{"mix 日本語 and English", "mix-日本語-and-english"},
+		{"", ""},
+		{"---", ""},
+		{"123 numbers", "123-numbers"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := slugify(tt.input)
+			if got != tt.want {
+				t.Errorf("slugify(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestGenerateFrontmatter tests the generateFrontmatter helper function
+func TestGenerateFrontmatter(t *testing.T) {
+	tests := []struct {
+		name    string
+		tags    []string
+		created string
+		updated string
+		want    string
+	}{
+		{
+			name:    "with tags",
+			tags:    []string{"zettelkasten", "productivity"},
+			created: "2026-02-15",
+			updated: "2026-02-15",
+			want:    "---\ntags:\n  - zettelkasten\n  - productivity\ncreated: 2026-02-15\nupdated: 2026-02-15\n---\n",
+		},
+		{
+			name:    "without tags",
+			tags:    nil,
+			created: "2026-01-01",
+			updated: "2026-01-01",
+			want:    "---\ncreated: 2026-01-01\nupdated: 2026-01-01\n---\n",
+		},
+		{
+			name:    "empty tags slice",
+			tags:    []string{},
+			created: "2026-03-01",
+			updated: "2026-03-01",
+			want:    "---\ncreated: 2026-03-01\nupdated: 2026-03-01\n---\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := generateFrontmatter(tt.tags, tt.created, tt.updated)
+			if got != tt.want {
+				t.Errorf("generateFrontmatter() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestCreateNoteHandler tests the create_note tool
+func TestCreateNoteHandler(t *testing.T) {
+	tmpVault := setupTestVault(t)
+	defer cleanupTestVault(t, tmpVault)
+
+	originalVaultPath := vaultPath
+	vaultPath = tmpVault
+	defer func() { vaultPath = originalVaultPath }()
+
+	today := time.Now().Format("2006-01-02")
+	ctx := context.Background()
+	req := &mcp.CallToolRequest{}
+
+	t.Run("create note in root", func(t *testing.T) {
+		input := CreateNoteInput{
+			Title:   "My Test Note",
+			Content: "Some content here.",
+			Tags:    []string{"test", "demo"},
+		}
+		result, output, err := createNoteHandler(ctx, req, input)
+		if err != nil {
+			t.Fatalf("createNoteHandler() error = %v", err)
+		}
+		if result == nil {
+			t.Fatal("result is nil")
+		}
+
+		expectedPath := filepath.Join(tmpVault, today+"_my-test-note.md")
+		if output.Path != expectedPath {
+			t.Errorf("output.Path = %q, want %q", output.Path, expectedPath)
+		}
+
+		data, err := os.ReadFile(expectedPath)
+		if err != nil {
+			t.Fatalf("failed to read created file: %v", err)
+		}
+		content := string(data)
+		if !strings.Contains(content, "# My Test Note") {
+			t.Error("missing heading in created note")
+		}
+		if !strings.Contains(content, "- test") {
+			t.Error("missing tag 'test' in frontmatter")
+		}
+		if !strings.Contains(content, "Some content here.") {
+			t.Error("missing body content")
+		}
+	})
+
+	t.Run("create note in subfolder", func(t *testing.T) {
+		input := CreateNoteInput{
+			Title:  "Subfolder Note",
+			Folder: "00_Inbox",
+		}
+		_, output, err := createNoteHandler(ctx, req, input)
+		if err != nil {
+			t.Fatalf("createNoteHandler() error = %v", err)
+		}
+
+		expectedPath := filepath.Join(tmpVault, "00_Inbox", today+"_subfolder-note.md")
+		if output.Path != expectedPath {
+			t.Errorf("output.Path = %q, want %q", output.Path, expectedPath)
+		}
+
+		if _, err := os.Stat(expectedPath); os.IsNotExist(err) {
+			t.Error("file was not created")
+		}
+	})
+
+	t.Run("error on duplicate", func(t *testing.T) {
+		input := CreateNoteInput{Title: "My Test Note"}
+		_, _, err := createNoteHandler(ctx, req, input)
+		if err == nil {
+			t.Error("expected error for duplicate file, got nil")
+		}
+		if !strings.Contains(err.Error(), "already exists") {
+			t.Errorf("expected 'already exists' error, got: %v", err)
+		}
+	})
+
+	t.Run("error on empty title", func(t *testing.T) {
+		input := CreateNoteInput{Title: ""}
+		_, _, err := createNoteHandler(ctx, req, input)
+		if err == nil {
+			t.Error("expected error for empty title, got nil")
+		}
+	})
+}
+
+// TestUpdateNoteHandler tests the update_note tool
+func TestUpdateNoteHandler(t *testing.T) {
+	tmpVault := setupTestVault(t)
+	defer cleanupTestVault(t, tmpVault)
+
+	originalVaultPath := vaultPath
+	vaultPath = tmpVault
+	defer func() { vaultPath = originalVaultPath }()
+
+	ctx := context.Background()
+	req := &mcp.CallToolRequest{}
+
+	t.Run("replace mode", func(t *testing.T) {
+		notePath := filepath.Join(tmpVault, "note1.md")
+		input := UpdateNoteInput{
+			Path:    notePath,
+			Content: "# Replaced Content\nNew body.",
+			Mode:    "replace",
+		}
+		_, output, err := updateNoteHandler(ctx, req, input)
+		if err != nil {
+			t.Fatalf("updateNoteHandler() error = %v", err)
+		}
+		if output.Path != notePath {
+			t.Errorf("output.Path = %q, want %q", output.Path, notePath)
+		}
+
+		data, _ := os.ReadFile(notePath)
+		if string(data) != "# Replaced Content\nNew body." {
+			t.Errorf("file content = %q, want replaced content", string(data))
+		}
+	})
+
+	t.Run("append mode", func(t *testing.T) {
+		notePath := filepath.Join(tmpVault, "daily-journal.md")
+		input := UpdateNoteInput{
+			Path:    notePath,
+			Content: "Appended text.",
+			Mode:    "append",
+		}
+		_, _, err := updateNoteHandler(ctx, req, input)
+		if err != nil {
+			t.Fatalf("updateNoteHandler() error = %v", err)
+		}
+
+		data, _ := os.ReadFile(notePath)
+		content := string(data)
+		if !strings.Contains(content, "# Daily Journal") {
+			t.Error("original content missing after append")
+		}
+		if !strings.HasSuffix(content, "\n\nAppended text.") {
+			t.Errorf("appended content not found at end: %q", content)
+		}
+	})
+
+	t.Run("default mode is replace", func(t *testing.T) {
+		notePath := filepath.Join(tmpVault, "subfolder/project-update.md")
+		input := UpdateNoteInput{
+			Path:    notePath,
+			Content: "Default replaced.",
+		}
+		_, _, err := updateNoteHandler(ctx, req, input)
+		if err != nil {
+			t.Fatalf("updateNoteHandler() error = %v", err)
+		}
+
+		data, _ := os.ReadFile(notePath)
+		if string(data) != "Default replaced." {
+			t.Errorf("file content = %q, want 'Default replaced.'", string(data))
+		}
+	})
+
+	t.Run("error on nonexistent file", func(t *testing.T) {
+		input := UpdateNoteInput{
+			Path:    filepath.Join(tmpVault, "nonexistent.md"),
+			Content: "test",
+		}
+		_, _, err := updateNoteHandler(ctx, req, input)
+		if err == nil {
+			t.Error("expected error for nonexistent file")
+		}
+	})
+
+	t.Run("error on invalid mode", func(t *testing.T) {
+		input := UpdateNoteInput{
+			Path:    filepath.Join(tmpVault, "daily-journal.md"),
+			Content: "test",
+			Mode:    "invalid",
+		}
+		_, _, err := updateNoteHandler(ctx, req, input)
+		if err == nil {
+			t.Error("expected error for invalid mode")
+		}
+	})
+
+	t.Run("error on path outside vault", func(t *testing.T) {
+		input := UpdateNoteInput{
+			Path:    "/tmp/outside.md",
+			Content: "test",
+		}
+		_, _, err := updateNoteHandler(ctx, req, input)
+		if err == nil {
+			t.Error("expected error for path outside vault")
+		}
+	})
+}
+
+// TestDeleteNoteHandler tests the delete_note tool
+func TestDeleteNoteHandler(t *testing.T) {
+	tmpVault := setupTestVault(t)
+	defer cleanupTestVault(t, tmpVault)
+
+	originalVaultPath := vaultPath
+	vaultPath = tmpVault
+	defer func() { vaultPath = originalVaultPath }()
+
+	ctx := context.Background()
+	req := &mcp.CallToolRequest{}
+
+	t.Run("delete existing note", func(t *testing.T) {
+		notePath := filepath.Join(tmpVault, "daily-journal.md")
+		_, output, err := deleteNoteHandler(ctx, req, DeleteNoteInput{Path: notePath})
+		if err != nil {
+			t.Fatalf("deleteNoteHandler() error = %v", err)
+		}
+		if output.Path != notePath {
+			t.Errorf("output.Path = %q, want %q", output.Path, notePath)
+		}
+		if _, err := os.Stat(notePath); !os.IsNotExist(err) {
+			t.Error("file still exists after delete")
+		}
+	})
+
+	t.Run("error on non-md file", func(t *testing.T) {
+		_, _, err := deleteNoteHandler(ctx, req, DeleteNoteInput{
+			Path: filepath.Join(tmpVault, "not-markdown.txt"),
+		})
+		if err == nil {
+			t.Error("expected error for non-.md file")
+		}
+		if !strings.Contains(err.Error(), ".md") {
+			t.Errorf("expected .md error, got: %v", err)
+		}
+	})
+
+	t.Run("error on nonexistent file", func(t *testing.T) {
+		_, _, err := deleteNoteHandler(ctx, req, DeleteNoteInput{
+			Path: filepath.Join(tmpVault, "nonexistent.md"),
+		})
+		if err == nil {
+			t.Error("expected error for nonexistent file")
+		}
+	})
+
+	t.Run("error on directory", func(t *testing.T) {
+		// Create a directory ending in .md to test the directory guard
+		dirPath := filepath.Join(tmpVault, "fake-dir.md")
+		if err := os.MkdirAll(dirPath, 0755); err != nil {
+			t.Fatalf("failed to create test dir: %v", err)
+		}
+		_, _, err := deleteNoteHandler(ctx, req, DeleteNoteInput{Path: dirPath})
+		if err == nil {
+			t.Error("expected error for directory")
+		}
+		if !strings.Contains(err.Error(), "directories") {
+			t.Errorf("expected 'directories' error, got: %v", err)
+		}
+	})
+
+	t.Run("error on path outside vault", func(t *testing.T) {
+		_, _, err := deleteNoteHandler(ctx, req, DeleteNoteInput{
+			Path: "/tmp/outside.md",
+		})
+		if err == nil {
+			t.Error("expected error for path outside vault")
+		}
+	})
+}
+
+// TestSearchContentHandler tests the search_content tool
+func TestSearchContentHandler(t *testing.T) {
+	tmpVault := setupTestVault(t)
+	defer cleanupTestVault(t, tmpVault)
+
+	originalVaultPath := vaultPath
+	vaultPath = tmpVault
+	defer func() { vaultPath = originalVaultPath }()
+
+	ctx := context.Background()
+	req := &mcp.CallToolRequest{}
+
+	tests := []struct {
+		name         string
+		query        string
+		wantMinCount int
+		wantContains string
+	}{
+		{
+			name:         "search for content in body",
+			query:        "first note",
+			wantMinCount: 1,
+			wantContains: "note1.md",
+		},
+		{
+			name:         "case insensitive search",
+			query:        "PROJECT PLAN",
+			wantMinCount: 1,
+			wantContains: "project-plan.md",
+		},
+		{
+			name:         "regex search",
+			query:        `^# Zettel \d`,
+			wantMinCount: 2,
+			wantContains: "zettel",
+		},
+		{
+			name:         "search across multiple files",
+			query:        "subfolder",
+			wantMinCount: 2,
+		},
+		{
+			name:         "no matches",
+			query:        "xyznonexistent123",
+			wantMinCount: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, output, err := searchContentHandler(ctx, req, SearchContentInput{Query: tt.query})
+			if err != nil {
+				t.Fatalf("searchContentHandler() error = %v", err)
+			}
+			if result == nil {
+				t.Fatal("result is nil")
+			}
+			if len(output.Results) < tt.wantMinCount {
+				t.Errorf("got %d results, want at least %d", len(output.Results), tt.wantMinCount)
+			}
+			if tt.wantContains != "" {
+				found := false
+				for _, m := range output.Results {
+					if strings.Contains(m.Path, tt.wantContains) {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("results missing expected file containing %q", tt.wantContains)
+				}
+			}
+			// Verify line numbers are positive
+			for _, m := range output.Results {
+				if m.Line <= 0 {
+					t.Errorf("invalid line number %d for %s", m.Line, m.Path)
+				}
+			}
+		})
+	}
+}
+
+// TestGetBacklinksHandler tests the get_backlinks tool
+func TestGetBacklinksHandler(t *testing.T) {
+	tmpVault := setupTestVault(t)
+	defer cleanupTestVault(t, tmpVault)
+
+	originalVaultPath := vaultPath
+	vaultPath = tmpVault
+	defer func() { vaultPath = originalVaultPath }()
+
+	ctx := context.Background()
+	req := &mcp.CallToolRequest{}
+
+	t.Run("find backlinks to note1", func(t *testing.T) {
+		result, output, err := getBacklinksHandler(ctx, req, GetBacklinksInput{NoteName: "note1"})
+		if err != nil {
+			t.Fatalf("getBacklinksHandler() error = %v", err)
+		}
+		if result == nil {
+			t.Fatal("result is nil")
+		}
+		// note2.md has [[note1]], project-plan.md has [[note1|first note]]
+		if len(output.Results) != 2 {
+			t.Errorf("got %d backlinks, want 2. Results: %+v", len(output.Results), output.Results)
+		}
+	})
+
+	t.Run("find backlinks to project-plan", func(t *testing.T) {
+		_, output, err := getBacklinksHandler(ctx, req, GetBacklinksInput{NoteName: "project-plan"})
+		if err != nil {
+			t.Fatalf("getBacklinksHandler() error = %v", err)
+		}
+		// nested-note.md has [[project-plan]]
+		if len(output.Results) != 1 {
+			t.Errorf("got %d backlinks, want 1. Results: %+v", len(output.Results), output.Results)
+		}
+	})
+
+	t.Run("find backlinks to zettel1", func(t *testing.T) {
+		_, output, err := getBacklinksHandler(ctx, req, GetBacklinksInput{NoteName: "zettel1"})
+		if err != nil {
+			t.Fatalf("getBacklinksHandler() error = %v", err)
+		}
+		// zettel2.md has [[zettel1]]
+		if len(output.Results) != 1 {
+			t.Errorf("got %d backlinks, want 1. Results: %+v", len(output.Results), output.Results)
+		}
+	})
+
+	t.Run("no backlinks", func(t *testing.T) {
+		_, output, err := getBacklinksHandler(ctx, req, GetBacklinksInput{NoteName: "daily-journal"})
+		if err != nil {
+			t.Fatalf("getBacklinksHandler() error = %v", err)
+		}
+		if len(output.Results) != 0 {
+			t.Errorf("got %d backlinks, want 0", len(output.Results))
+		}
+	})
+
+	t.Run("handles .md suffix in input", func(t *testing.T) {
+		_, output, err := getBacklinksHandler(ctx, req, GetBacklinksInput{NoteName: "note1.md"})
+		if err != nil {
+			t.Fatalf("getBacklinksHandler() error = %v", err)
+		}
+		if len(output.Results) != 2 {
+			t.Errorf("got %d backlinks, want 2", len(output.Results))
+		}
+	})
+
+	t.Run("error on empty name", func(t *testing.T) {
+		_, _, err := getBacklinksHandler(ctx, req, GetBacklinksInput{NoteName: ""})
+		if err == nil {
+			t.Error("expected error for empty note_name")
+		}
+	})
+}
+
+// TestListTagsHandler tests the list_tags tool
+func TestListTagsHandler(t *testing.T) {
+	tmpVault := setupTestVault(t)
+	defer cleanupTestVault(t, tmpVault)
+
+	originalVaultPath := vaultPath
+	vaultPath = tmpVault
+	defer func() { vaultPath = originalVaultPath }()
+
+	ctx := context.Background()
+	req := &mcp.CallToolRequest{}
+
+	t.Run("list all tags", func(t *testing.T) {
+		result, output, err := listTagsHandler(ctx, req, ListTagsInput{})
+		if err != nil {
+			t.Fatalf("listTagsHandler() error = %v", err)
+		}
+		if result == nil {
+			t.Fatal("result is nil")
+		}
+		if len(output.Tags) == 0 {
+			t.Fatal("expected tags, got none")
+		}
+
+		// Check that known tags exist
+		tagMap := make(map[string]int)
+		for _, tc := range output.Tags {
+			tagMap[tc.Tag] = tc.Count
+		}
+
+		// Frontmatter tags
+		if _, ok := tagMap["zettelkasten"]; !ok {
+			t.Error("missing frontmatter tag 'zettelkasten'")
+		}
+		if count := tagMap["productivity"]; count < 1 {
+			t.Errorf("expected 'productivity' count >= 1, got %d", count)
+		}
+
+		// Inline tags
+		if _, ok := tagMap["workflow"]; !ok {
+			t.Error("missing inline tag 'workflow'")
+		}
+		if _, ok := tagMap["idea"]; !ok {
+			t.Error("missing inline tag 'idea'")
+		}
+
+		// Verify sorted order
+		for i := 1; i < len(output.Tags); i++ {
+			if output.Tags[i].Tag < output.Tags[i-1].Tag {
+				t.Errorf("tags not sorted: %q before %q", output.Tags[i-1].Tag, output.Tags[i].Tag)
+			}
+		}
+	})
+
+	t.Run("filter by prefix", func(t *testing.T) {
+		_, output, err := listTagsHandler(ctx, req, ListTagsInput{Prefix: "zettel"})
+		if err != nil {
+			t.Fatalf("listTagsHandler() error = %v", err)
+		}
+		for _, tc := range output.Tags {
+			if !strings.HasPrefix(tc.Tag, "zettel") {
+				t.Errorf("tag %q does not match prefix 'zettel'", tc.Tag)
+			}
+		}
+		if len(output.Tags) == 0 {
+			t.Error("expected at least one tag with prefix 'zettel'")
+		}
+	})
+
+	t.Run("prefix with no matches", func(t *testing.T) {
+		_, output, err := listTagsHandler(ctx, req, ListTagsInput{Prefix: "nonexistent"})
+		if err != nil {
+			t.Fatalf("listTagsHandler() error = %v", err)
+		}
+		if len(output.Tags) != 0 {
+			t.Errorf("expected 0 tags, got %d", len(output.Tags))
+		}
+	})
+}
+
+// TestParseFrontmatterTags tests the frontmatter tag parsing helper
+func TestParseFrontmatterTags(t *testing.T) {
+	tests := []struct {
+		name        string
+		frontmatter string
+		wantTags    map[string]int
+	}{
+		{
+			name:        "block style tags",
+			frontmatter: "tags:\n  - alpha\n  - beta\ncreated: 2026-01-01",
+			wantTags:    map[string]int{"alpha": 1, "beta": 1},
+		},
+		{
+			name:        "inline style tags",
+			frontmatter: "tags: [foo, bar, baz]\ncreated: 2026-01-01",
+			wantTags:    map[string]int{"foo": 1, "bar": 1, "baz": 1},
+		},
+		{
+			name:        "no tags field",
+			frontmatter: "created: 2026-01-01\nupdated: 2026-01-01",
+			wantTags:    map[string]int{},
+		},
+		{
+			name:        "empty tags block",
+			frontmatter: "tags:\ncreated: 2026-01-01",
+			wantTags:    map[string]int{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tagCounts := make(map[string]int)
+			parseFrontmatterTags(tt.frontmatter, tagCounts)
+			for tag, wantCount := range tt.wantTags {
+				if got := tagCounts[tag]; got != wantCount {
+					t.Errorf("tag %q count = %d, want %d", tag, got, wantCount)
+				}
+			}
+			if len(tagCounts) != len(tt.wantTags) {
+				t.Errorf("got %d tags, want %d. Tags: %v", len(tagCounts), len(tt.wantTags), tagCounts)
+			}
+		})
 	}
 }
