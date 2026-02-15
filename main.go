@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"log"
@@ -597,17 +596,13 @@ func searchContentHandler(ctx context.Context, req *mcp.CallToolRequest, input S
 			return nil
 		}
 
-		file, err := os.Open(path)
+		data, err := os.ReadFile(path)
 		if err != nil {
 			return nil
 		}
-		defer func() { _ = file.Close() }()
 
-		scanner := bufio.NewScanner(file)
-		lineNum := 0
-		for scanner.Scan() {
-			lineNum++
-			line := scanner.Text()
+		lines := strings.Split(string(data), "\n")
+		for lineNum, line := range lines {
 
 			matched := false
 			if useRegex {
@@ -619,8 +614,8 @@ func searchContentHandler(ctx context.Context, req *mcp.CallToolRequest, input S
 			if matched {
 				results = append(results, ContentMatch{
 					Path:    path,
-					Line:    lineNum,
 					Snippet: line,
+					Line:    lineNum + 1,
 				})
 				if len(results) >= maxSearchResults {
 					return filepath.SkipAll
