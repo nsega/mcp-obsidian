@@ -865,11 +865,11 @@ func TestSlugify(t *testing.T) {
 // TestGenerateFrontmatter tests the generateFrontmatter helper function
 func TestGenerateFrontmatter(t *testing.T) {
 	tests := []struct {
-		tags    []string
 		name    string
 		created string
 		updated string
 		want    string
+		tags    []string
 	}{
 		{
 			name:    "with tags",
