@@ -865,8 +865,8 @@ func TestSlugify(t *testing.T) {
 // TestGenerateFrontmatter tests the generateFrontmatter helper function
 func TestGenerateFrontmatter(t *testing.T) {
 	tests := []struct {
-		name    string
 		tags    []string
+		name    string
 		created string
 		updated string
 		want    string
@@ -1019,7 +1019,10 @@ func TestUpdateNoteHandler(t *testing.T) {
 			t.Errorf("output.Path = %q, want %q", output.Path, notePath)
 		}
 
-		data, _ := os.ReadFile(notePath)
+		data, err := os.ReadFile(notePath)
+		if err != nil {
+			t.Fatalf("failed to read file: %v", err)
+		}
 		if string(data) != "# Replaced Content\nNew body." {
 			t.Errorf("file content = %q, want replaced content", string(data))
 		}
@@ -1037,7 +1040,10 @@ func TestUpdateNoteHandler(t *testing.T) {
 			t.Fatalf("updateNoteHandler() error = %v", err)
 		}
 
-		data, _ := os.ReadFile(notePath)
+		data, err := os.ReadFile(notePath)
+		if err != nil {
+			t.Fatalf("failed to read file: %v", err)
+		}
 		content := string(data)
 		if !strings.Contains(content, "# Daily Journal") {
 			t.Error("original content missing after append")
@@ -1058,7 +1064,10 @@ func TestUpdateNoteHandler(t *testing.T) {
 			t.Fatalf("updateNoteHandler() error = %v", err)
 		}
 
-		data, _ := os.ReadFile(notePath)
+		data, err := os.ReadFile(notePath)
+		if err != nil {
+			t.Fatalf("failed to read file: %v", err)
+		}
 		if string(data) != "Default replaced." {
 			t.Errorf("file content = %q, want 'Default replaced.'", string(data))
 		}
@@ -1186,8 +1195,8 @@ func TestSearchContentHandler(t *testing.T) {
 	tests := []struct {
 		name         string
 		query        string
-		wantMinCount int
 		wantContains string
+		wantMinCount int
 	}{
 		{
 			name:         "search for content in body",
@@ -1412,9 +1421,9 @@ func TestListTagsHandler(t *testing.T) {
 // TestParseFrontmatterTags tests the frontmatter tag parsing helper
 func TestParseFrontmatterTags(t *testing.T) {
 	tests := []struct {
+		wantTags    map[string]int
 		name        string
 		frontmatter string
-		wantTags    map[string]int
 	}{
 		{
 			name:        "block style tags",

@@ -94,8 +94,8 @@ type SearchContentInput struct {
 // ContentMatch represents a single content search match
 type ContentMatch struct {
 	Path    string `json:"path" jsonschema:"File path of the matching note"`
-	Line    int    `json:"line" jsonschema:"Line number of the match"`
 	Snippet string `json:"snippet" jsonschema:"The matching line content"`
+	Line    int    `json:"line" jsonschema:"Line number of the match"`
 }
 
 // SearchContentOutput defines the output for the search_content tool
@@ -174,6 +174,30 @@ func generateFrontmatter(tags []string, created, updated string) string {
 	return b.String()
 }
 
+// resolveWithAncestors resolves symlinks by walking up to the nearest existing
+// ancestor directory and re-appending the remaining path segments.
+func resolveWithAncestors(absPath string) string {
+	current := absPath
+	var tail []string
+	for {
+		resolved, err := filepath.EvalSymlinks(current)
+		if err == nil {
+			// Found an existing ancestor — rejoin the tail
+			for i := len(tail) - 1; i >= 0; i-- {
+				resolved = filepath.Join(resolved, tail[i])
+			}
+			return resolved
+		}
+		parent := filepath.Dir(current)
+		if parent == current {
+			// Reached filesystem root without finding existing path
+			return absPath
+		}
+		tail = append(tail, filepath.Base(current))
+		current = parent
+	}
+}
+
 // isPathAllowed checks if a given path is within the allowed vault directory
 // and doesn't access hidden files or directories
 func isPathAllowed(path string) (bool, error) {
@@ -195,9 +219,10 @@ func isPathAllowed(path string) (bool, error) {
 	// Resolve symlinks
 	resolvedPath, err := filepath.EvalSymlinks(absPath)
 	if err != nil {
-		// If the file doesn't exist, check the parent directory
+		// If the path doesn't exist, walk up to the nearest existing
+		// ancestor, resolve its symlinks, then re-append the remainder.
 		if os.IsNotExist(err) {
-			resolvedPath = absPath
+			resolvedPath = resolveWithAncestors(absPath)
 		} else {
 			return false, fmt.Errorf("failed to resolve symlinks: %w", err)
 		}
@@ -215,7 +240,7 @@ func isPathAllowed(path string) (bool, error) {
 		if !os.IsNotExist(err) {
 			return false, fmt.Errorf("failed to resolve vault symlinks: %w", err)
 		}
-		resolvedVaultPath = absVaultPath
+		resolvedVaultPath = resolveWithAncestors(absVaultPath)
 	}
 
 	// Clean paths
@@ -528,7 +553,7 @@ func deleteNoteHandler(ctx context.Context, req *mcp.CallToolRequest, input Dele
 		return nil, DeleteNoteOutput{}, fmt.Errorf("failed to delete file: %w", err)
 	}
 
-	output := DeleteNoteOutput{Path: input.Path}
+	output := DeleteNoteOutput(input)
 	result := &mcp.CallToolResult{
 		Content: []mcp.Content{
 			&mcp.TextContent{Text: fmt.Sprintf("Deleted note: %s", input.Path)},
@@ -576,7 +601,7 @@ func searchContentHandler(ctx context.Context, req *mcp.CallToolRequest, input S
 		if err != nil {
 			return nil
 		}
-		defer file.Close()
+		defer func() { _ = file.Close() }()
 
 		scanner := bufio.NewScanner(file)
 		lineNum := 0
