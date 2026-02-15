@@ -1,13 +1,19 @@
 # mcp-obsidian
 
-A Model Context Protocol (MCP) server for reading and searching Markdown notes in directories like Obsidian vaults.
+A Model Context Protocol (MCP) server for managing Markdown notes in Obsidian vaults with full Zettelkasten workflow support.
 
-This is a Go rewrite inspired by [mcp-obsidian](https://github.com/smithery-ai/mcp-obsidian) using the [MCP Go SDK v1.1](https://github.com/modelcontextprotocol/go-sdk).
+This is a Go rewrite inspired by [mcp-obsidian](https://github.com/smithery-ai/mcp-obsidian) using the [MCP Go SDK v1.3](https://github.com/modelcontextprotocol/go-sdk).
 
 ## Features
 
 - **Search Notes**: Find notes by filename using case-insensitive matching with regex support
 - **Read Notes**: Read the content of one or more notes with error handling per file
+- **Create Notes**: Create notes with `YYYY-MM-DD_slug.md` naming convention and YAML frontmatter
+- **Update Notes**: Replace or append content to existing notes
+- **Delete Notes**: Safely remove markdown notes from the vault
+- **Search Content**: Full-text search across note bodies with line numbers and snippets
+- **Get Backlinks**: Discover all `[[wikilink]]` references to a given note
+- **List Tags**: Collect and count tags from YAML frontmatter and inline `#tags`
 - **Security**: Built-in path validation to prevent directory traversal and access to hidden files
 - **Performance**: Native Go implementation for fast execution
 
@@ -109,6 +115,110 @@ Read the content of one or more notes.
 
 Returns the content of each note with error handling for individual files.
 
+### create_note
+
+Create a new note with the Zettelkasten naming convention and YAML frontmatter.
+
+**Input**:
+- `title` (string, required): Title for the note (used in filename slug and heading)
+- `content` (string, optional): Markdown body content
+- `folder` (string, optional): Subfolder within the vault (e.g. `30_Permanent`, `10_FleetingNote`)
+- `tags` (array of strings, optional): Frontmatter tags
+
+**Example**:
+```json
+{
+  "title": "GTD Zettelkasten Flowchart",
+  "content": "A note about combining GTD with Zettelkasten.",
+  "folder": "30_Permanent",
+  "tags": ["zettelkasten", "gtd", "productivity"]
+}
+```
+
+Creates a file like `30_Permanent/2026-02-15_gtd-zettelkasten-flowchart.md` with YAML frontmatter containing tags, created, and updated dates.
+
+### update_note
+
+Update an existing note's content.
+
+**Input**:
+- `path` (string, required): Full path to the note
+- `content` (string, required): New content to write or append
+- `mode` (string, optional): `replace` (default) or `append`
+
+**Example**:
+```json
+{
+  "path": "/path/to/vault/30_Permanent/2026-02-15_my-note.md",
+  "content": "\n## New Section\nAdditional thoughts.",
+  "mode": "append"
+}
+```
+
+### delete_note
+
+Delete a markdown note from the vault.
+
+**Input**:
+- `path` (string, required): Full path to the note to delete
+
+**Example**:
+```json
+{
+  "path": "/path/to/vault/00_Inbox/2026-02-15_scratch.md"
+}
+```
+
+Only `.md` files can be deleted. Directories cannot be deleted.
+
+### search_content
+
+Full-text search across note bodies. Returns matching file paths, line numbers, and snippets.
+
+**Input**:
+- `query` (string, required): Search query or regex pattern
+
+**Example**:
+```json
+{
+  "query": "Zettelkasten"
+}
+```
+
+Returns up to 200 matches with file path, line number, and the matching line content.
+
+### get_backlinks
+
+Find all notes that link to a given note via `[[wikilinks]]`.
+
+**Input**:
+- `note_name` (string, required): Note name without `.md` extension or path
+
+**Example**:
+```json
+{
+  "note_name": "my-permanent-note"
+}
+```
+
+Returns source file paths and the lines containing the wikilinks. Supports both `[[note]]` and `[[note|alias]]` syntax.
+
+### list_tags
+
+List all tags found across the vault from YAML frontmatter and inline `#tags`.
+
+**Input**:
+- `prefix` (string, optional): Filter tags by prefix
+
+**Example**:
+```json
+{
+  "prefix": "project"
+}
+```
+
+Returns a sorted, deduplicated list of tags with their occurrence counts.
+
 ## Security
 
 The server implements several security measures:
@@ -168,7 +278,7 @@ npx @modelcontextprotocol/inspector mcp-obsidian ~/test-vault
 This will:
 1. Start your MCP server
 2. Open a web interface (usually at http://localhost:5173)
-3. Allow you to interactively test the `search_notes` and `read_notes` tools
+3. Allow you to interactively test all 8 tools
 4. View the JSON-RPC messages being exchanged
 
 ### 4. Manual Testing with JSON-RPC
@@ -222,8 +332,8 @@ After configuring the server in Claude Desktop (see Configuration section above)
 
 ## Requirements
 
-- Go 1.24 or later
-- MCP Go SDK v1.1
+- Go 1.25 or later
+- MCP Go SDK v1.3
 
 ## License
 
