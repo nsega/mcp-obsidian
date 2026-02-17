@@ -2,8 +2,7 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"log"
+	"log/slog"
 	"os"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -18,22 +17,28 @@ var (
 )
 
 func main() {
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	}))
+
 	if len(os.Args) < 2 {
-		log.Fatal("Usage: mcp-obsidian <vault-path>")
+		logger.Error("usage: mcp-obsidian <vault-path>")
+		os.Exit(1)
 	}
 
 	v, err := vault.New(os.Args[1])
 	if err != nil {
-		log.Fatalf("Failed to initialize vault: %v", err)
+		logger.Error("failed to initialize vault", "error", err)
+		os.Exit(1)
 	}
 
-	h := handler.New(v)
-	srv := server.New(h, Version)
+	h := handler.New(v, logger)
+	srv := server.New(h, Version, logger)
 
-	fmt.Fprintf(os.Stderr, "MCP Obsidian server starting...\n")
-	fmt.Fprintf(os.Stderr, "Vault path: %s\n", v.Path)
+	logger.Info("server starting", "vault", v.Path, "version", Version)
 
 	if err := srv.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
-		log.Fatalf("Server error: %v", err)
+		logger.Error("server error", "error", err)
+		os.Exit(1)
 	}
 }
