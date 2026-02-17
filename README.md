@@ -1,6 +1,7 @@
 # mcp-obsidian
 
 [![Go Version](https://img.shields.io/github/go-mod/go-version/nsega/mcp-obsidian)](https://go.dev/)
+[![Build and Test](https://github.com/nsega/mcp-obsidian/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/nsega/mcp-obsidian/actions/workflows/build-and-test.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A Model Context Protocol (MCP) server for managing Markdown notes in Obsidian vaults with full Zettelkasten workflow support.
@@ -18,7 +19,7 @@ This is a Go rewrite inspired by [mcp-obsidian](https://github.com/smithery-ai/m
 - **Get Backlinks**: Discover all `[[wikilink]]` references to a given note
 - **List Tags**: Collect and count tags from YAML frontmatter and inline `#tags`
 - **Security**: Built-in path validation to prevent directory traversal and access to hidden files
-- **Performance**: Native Go implementation for fast execution
+- **Performance**: Native Go static binary with zero CGO dependencies
 
 ## Installation
 
@@ -27,8 +28,10 @@ This is a Go rewrite inspired by [mcp-obsidian](https://github.com/smithery-ai/m
 ```bash
 git clone https://github.com/nsega/mcp-obsidian.git
 cd mcp-obsidian
-go build -o mcp-obsidian .
+make build
 ```
+
+The binary is written to `build/mcp-obsidian`.
 
 ### Using go install
 
@@ -43,7 +46,7 @@ go install github.com/nsega/mcp-obsidian@latest
 Run the server with the path to your vault:
 
 ```bash
-./mcp-obsidian /path/to/your/vault
+./build/mcp-obsidian /path/to/your/vault
 ```
 
 The server communicates over stdin/stdout using the MCP protocol.
@@ -52,8 +55,23 @@ The server communicates over stdin/stdout using the MCP protocol.
 
 Add the following to your Claude Desktop configuration file:
 
-**MacOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+**macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "obsidian": {
+      "command": "/path/to/mcp-obsidian",
+      "args": ["/path/to/your/vault"]
+    }
+  }
+}
+```
+
+### Configuration for Claude Code
+
+Add to your `~/.claude/settings.json` or project `.claude/settings.json`:
 
 ```json
 {
@@ -231,112 +249,107 @@ The server implements several security measures:
 - **Symlink Resolution**: Symlinks are resolved and validated to prevent directory escape attacks
 - **Error Handling**: Individual file read failures don't halt operations
 
-## Building
+## Project Structure
+
+```
+main.go                     CLI entry point (~40 lines)
+internal/
+├── note/
+│   ├── types.go            Input/Output structs for all 8 tools
+│   ├── util.go             Slugify, GenerateFrontmatter, ParseFrontmatterTags
+│   └── util_test.go
+├── vault/
+│   ├── vault.go            Vault struct, path validation, symlink resolution
+│   └── vault_test.go
+├── handler/
+│   ├── handler.go          8 MCP tool handler methods
+│   └── handler_test.go
+├── server/
+│   └── server.go           MCP server creation and tool registration
+└── testutil/
+    └── testutil.go         Shared test vault setup/cleanup helpers
+```
+
+## Development
+
+### Prerequisites
+
+- Go 1.25 or later
+- [golangci-lint](https://golangci-lint.run/welcome/install/) (for linting)
+
+### Build
 
 ```bash
-go build -o mcp-obsidian .
+make build          # Build binary to build/mcp-obsidian
+make build-all      # Cross-compile for linux/darwin/windows (amd64/arm64)
 ```
 
-## Testing Locally
-
-### 1. Create a Test Vault
-
-First, create a test directory with some sample Markdown files:
+### Test
 
 ```bash
-# Create a test vault directory
-mkdir -p ~/test-vault
-
-# Create some sample notes
-echo "# Meeting Notes" > ~/test-vault/meeting.md
-echo "# Project Ideas" > ~/test-vault/project-ideas.md
-echo "# Daily Journal" > ~/test-vault/journal.md
+make test           # Run all tests with race detector
+make coverage       # Run tests with HTML coverage report
 ```
 
-### 2. Build and Run the Server
+### Lint
 
 ```bash
-# Build the binary
-go build -o mcp-obsidian .
-
-# Run the server (it will output startup messages to stderr)
-./mcp-obsidian ~/test-vault
+make lint           # Run golangci-lint
+make check          # Run fmt + vet + lint + test
 ```
 
-The server will start and wait for MCP protocol messages on stdin. You should see:
-```
-MCP Obsidian server starting...
-Vault path: /home/user/test-vault
-```
-
-### 3. Using the MCP Inspector
-
-The easiest way to test your MCP server is using the official MCP Inspector tool:
+### Run
 
 ```bash
-# Install the MCP Inspector
-npx @modelcontextprotocol/inspector mcp-obsidian ~/test-vault
+make run VAULT=/path/to/your/vault
 ```
 
-This will:
-1. Start your MCP server
-2. Open a web interface (usually at http://localhost:5173)
-3. Allow you to interactively test all 8 tools
-4. View the JSON-RPC messages being exchanged
+Run `make help` for the full list of targets.
 
-### 4. Manual Testing with JSON-RPC
+### Testing with the MCP Inspector
 
-You can also test manually by sending JSON-RPC messages via stdin. Here's an example:
+The easiest way to interactively test the server is with the official MCP Inspector:
 
 ```bash
-# Start the server
-./mcp-obsidian ~/test-vault
-
-# Then send an initialize request (paste this JSON):
-{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test-client","version":"1.0.0"}}}
-
-# After initialization, call the search_notes tool:
-{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"search_notes","arguments":{"query":"meeting"}}}
+npx @modelcontextprotocol/inspector ./build/mcp-obsidian ~/my-vault
 ```
 
-### 5. Verify in Claude Desktop
+This opens a web UI at `http://localhost:5173` where you can test all 8 tools and view the JSON-RPC messages.
 
-After configuring the server in Claude Desktop (see Configuration section above):
+### Manual Testing with JSON-RPC
 
-1. Restart Claude Desktop
-2. Open the Claude Desktop logs to verify the server started:
-   - **MacOS**: `~/Library/Logs/Claude/mcp*.log`
-   - **Windows**: `%APPDATA%\Claude\logs\mcp*.log`
-3. In a conversation, you should see the tools become available
-4. Try asking: "Search my notes for 'meeting'" or "Read my project-ideas note"
+You can also test by piping JSON-RPC messages via stdin:
+
+```bash
+(printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}\n'; \
+ sleep 0.5; \
+ printf '{"jsonrpc":"2.0","method":"notifications/initialized"}\n'; \
+ sleep 0.3; \
+ printf '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}\n'; \
+ sleep 1) | ./build/mcp-obsidian ~/my-vault 2>/dev/null
+```
 
 ### Troubleshooting
 
 **Server doesn't start:**
-- Verify the vault path exists: `ls ~/test-vault`
-- Check file permissions: `ls -la ~/test-vault`
-- Ensure the binary is executable: `chmod +x mcp-obsidian`
+- Verify the vault path exists and is readable
+- Ensure the binary is executable: `chmod +x build/mcp-obsidian`
 
-**Tools not appearing in Claude Desktop:**
-- Check the configuration file path is correct
-- Verify the JSON syntax in the config file
-- Restart Claude Desktop after configuration changes
-- Check Claude Desktop logs for error messages
+**Tools not appearing in Claude Desktop / Claude Code:**
+- Check the configuration file path and JSON syntax
+- Restart the client after configuration changes
+- Check logs for error messages:
+  - Claude Desktop: `~/Library/Logs/Claude/mcp*.log` (macOS)
+  - Claude Code: check terminal output
 
 **Permission errors:**
 - Ensure the vault directory is readable
-- Check that you're not trying to access hidden files (those starting with `.`)
-- Verify the path is absolute, not relative
+- Hidden files (starting with `.`) are denied by design
+- Use absolute paths, not relative
 
 **No results from search:**
 - Verify your vault contains `.md` files
-- Check that the search query matches your filenames
-- Remember that search is case-insensitive and supports regex
-
-## Requirements
-
-- Go 1.25 or later
-- MCP Go SDK v1.3
+- Search is case-insensitive and supports regex
 
 ## License
 
