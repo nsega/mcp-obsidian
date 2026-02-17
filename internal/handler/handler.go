@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -17,12 +18,13 @@ import (
 
 // Handler holds the vault reference and provides MCP tool handler methods
 type Handler struct {
-	Vault *vault.Vault
+	Vault  *vault.Vault
+	Logger *slog.Logger
 }
 
-// New creates a new Handler with the given Vault
-func New(v *vault.Vault) *Handler {
-	return &Handler{Vault: v}
+// New creates a new Handler with the given Vault and Logger
+func New(v *vault.Vault, logger *slog.Logger) *Handler {
+	return &Handler{Vault: v, Logger: logger}
 }
 
 // SearchNotes implements the search_notes tool
@@ -41,7 +43,8 @@ func (h *Handler) SearchNotes(ctx context.Context, req *mcp.CallToolRequest, inp
 	// Walk through the vault directory
 	err := filepath.Walk(h.Vault.Path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return nil // Skip files with errors
+			h.Logger.Debug("skipping path", "path", path, "error", err)
+			return nil
 		}
 
 		// Skip directories
@@ -334,6 +337,7 @@ func (h *Handler) SearchContent(ctx context.Context, req *mcp.CallToolRequest, i
 
 	err := filepath.Walk(h.Vault.Path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
+			h.Logger.Debug("skipping path", "path", path, "error", err)
 			return nil
 		}
 
@@ -356,6 +360,7 @@ func (h *Handler) SearchContent(ctx context.Context, req *mcp.CallToolRequest, i
 
 		data, err := os.ReadFile(path)
 		if err != nil {
+			h.Logger.Debug("skipping unreadable file", "path", path, "error", err)
 			return nil
 		}
 
@@ -420,6 +425,7 @@ func (h *Handler) GetBacklinks(ctx context.Context, req *mcp.CallToolRequest, in
 
 	err := filepath.Walk(h.Vault.Path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
+			h.Logger.Debug("skipping path", "path", path, "error", err)
 			return nil
 		}
 
@@ -448,6 +454,7 @@ func (h *Handler) GetBacklinks(ctx context.Context, req *mcp.CallToolRequest, in
 
 		data, err := os.ReadFile(path)
 		if err != nil {
+			h.Logger.Debug("skipping unreadable file", "path", path, "error", err)
 			return nil
 		}
 
@@ -503,6 +510,7 @@ func (h *Handler) ListTags(ctx context.Context, req *mcp.CallToolRequest, input 
 
 	err := filepath.Walk(h.Vault.Path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
+			h.Logger.Debug("skipping path", "path", path, "error", err)
 			return nil
 		}
 
@@ -525,6 +533,7 @@ func (h *Handler) ListTags(ctx context.Context, req *mcp.CallToolRequest, input 
 
 		data, err := os.ReadFile(path)
 		if err != nil {
+			h.Logger.Debug("skipping unreadable file", "path", path, "error", err)
 			return nil
 		}
 
