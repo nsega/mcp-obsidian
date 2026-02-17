@@ -1,16 +1,20 @@
 package server
 
 import (
+	"log/slog"
+
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/nsega/mcp-obsidian/internal/handler"
 )
 
 // New creates a configured MCP server with all tools registered
-func New(h *handler.Handler, version string) *mcp.Server {
+func New(h *handler.Handler, version string, logger *slog.Logger) *mcp.Server {
 	srv := mcp.NewServer(&mcp.Implementation{
 		Name:    "mcp-obsidian",
 		Version: version,
-	}, nil)
+	}, &mcp.ServerOptions{
+		Logger: logger,
+	})
 
 	// Register search_notes tool
 	mcp.AddTool(srv, &mcp.Tool{
