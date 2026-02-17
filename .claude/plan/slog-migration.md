@@ -1,6 +1,6 @@
 # Migrate Logging to `log/slog`
 
-**Status: PENDING**
+**Status: COMPLETED**
 
 ## Context
 
@@ -26,7 +26,7 @@ internal/handler/handler.go — add Logger field, log swallowed errors
 
 ## Implementation Steps
 
-### Step 1: Update `internal/server/server.go`
+### Step 1: Update `internal/server/server.go` ✅
 
 Accept a `*slog.Logger` parameter and pass it to `mcp.ServerOptions`:
 
@@ -45,7 +45,7 @@ func New(h *handler.Handler, version string, logger *slog.Logger) *mcp.Server {
 
 **Rationale:** The SDK will use this logger for built-in events like `"server session connected"`, `"server session disconnected"`, `"server connect error"`, etc. — all structured with key-value pairs.
 
-### Step 2: Add `*slog.Logger` to `internal/handler/handler.go`
+### Step 2: Add `*slog.Logger` to `internal/handler/handler.go` ✅
 
 Add logger field to `Handler` and accept it in constructor:
 
@@ -117,7 +117,7 @@ if err != nil {
 
 **Log level choice:** `Debug` is appropriate here because these are expected conditions (permission errors, disappeared files) during normal vault traversal. They should not clutter output by default but must be available for troubleshooting.
 
-### Step 3: Rewrite `main.go` logging
+### Step 3: Rewrite `main.go` logging ✅
 
 Replace all `log` and `fmt.Fprintf` usage with `slog`:
 
@@ -167,7 +167,7 @@ func main() {
 - Remove `"log"` and `"fmt"` imports, add `"log/slog"`
 - `TextHandler` to stderr (JSON would break human readability for a CLI tool; stderr is correct since stdout is reserved for MCP protocol)
 
-### Step 4: Update tests
+### Step 4: Update tests ✅
 
 Update `handler.New()` calls in tests to pass a discard logger:
 
@@ -178,7 +178,7 @@ h := handler.New(v, slog.New(slog.NewTextHandler(io.Discard, nil)))
 
 This keeps tests silent while ensuring the logger interface is satisfied.
 
-### Step 5: Verify
+### Step 5: Verify ✅
 
 1. `go build ./...` — compilation
 2. `go test -v -race ./...` — all tests pass
