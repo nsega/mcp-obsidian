@@ -1,0 +1,15 @@
+Plan saved to `.claude/plan/slog-migration.md`. Here's a summary:
+
+**5 steps across 3 files** (+ tests), zero new dependencies:
+
+| Step | File | Change |
+|------|------|--------|
+| 1 | `internal/server/server.go` | Accept `*slog.Logger`, pass to `mcp.ServerOptions.Logger` |
+| 2 | `internal/handler/handler.go` | Add `Logger` field, log 8 silently-swallowed errors at `Debug` level |
+| 3 | `main.go` | Create `slog.TextHandler` on stderr, replace `log.Fatal`/`fmt.Fprintf` |
+| 4 | `internal/handler/handler_test.go` | Pass discard logger to `handler.New()` |
+| 5 | Verify | `go build`, `go test -race`, `go vet` |
+
+The key discovery is that the **MCP Go SDK already accepts `*slog.Logger`** via `ServerOptions.Logger` — we just need to stop passing `nil`. This gives us structured logging of server lifecycle events (session connect/disconnect, errors) for free.
+
+Want me to proceed with the implementation?
