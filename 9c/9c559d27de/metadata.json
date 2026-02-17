@@ -1,0 +1,35 @@
+{
+  "cli_version": "0.4.4",
+  "checkpoint_id": "9c9c559d27de",
+  "strategy": "manual-commit",
+  "branch": "refactor/split-main-into-internal-packages",
+  "checkpoints_count": 1,
+  "files_touched": [
+    ".claude/plan/refactor-main-go.md",
+    "internal/handler/handler.go",
+    "internal/handler/handler_test.go",
+    "internal/note/types.go",
+    "internal/note/util.go",
+    "internal/note/util_test.go",
+    "internal/server/server.go",
+    "internal/vault/vault.go",
+    "internal/vault/vault_test.go",
+    "main.go"
+  ],
+  "sessions": [
+    {
+      "metadata": "/9c/9c559d27de/0/metadata.json",
+      "transcript": "/9c/9c559d27de/0/full.jsonl",
+      "context": "/9c/9c559d27de/0/context.md",
+      "content_hash": "/9c/9c559d27de/0/content_hash.txt",
+      "prompt": "/9c/9c559d27de/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 1635,
+    "cache_creation_tokens": 153376,
+    "cache_read_tokens": 9513617,
+    "output_tokens": 4513,
+    "api_call_count": 93
+  }
+}

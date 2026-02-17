@@ -1,0 +1,40 @@
+{
+  "cli_version": "0.4.4",
+  "checkpoint_id": "9c9c559d27de",
+  "session_id": "38163159-efca-4f00-a097-3234ceae7ed0",
+  "strategy": "manual-commit",
+  "created_at": "2026-02-17T06:06:28.938521Z",
+  "branch": "refactor/split-main-into-internal-packages",
+  "checkpoints_count": 1,
+  "files_touched": [
+    ".claude/plan/refactor-main-go.md",
+    "internal/handler/handler.go",
+    "internal/handler/handler_test.go",
+    "internal/note/types.go",
+    "internal/note/util.go",
+    "internal/note/util_test.go",
+    "internal/server/server.go",
+    "internal/vault/vault.go",
+    "internal/vault/vault_test.go",
+    "main.go"
+  ],
+  "agent": "Claude Code",
+  "transcript_identifier_at_start": "bd7c0023-aa2c-4425-afa8-72bd68ff03b0",
+  "token_usage": {
+    "input_tokens": 1635,
+    "cache_creation_tokens": 153376,
+    "cache_read_tokens": 9513617,
+    "output_tokens": 4513,
+    "api_call_count": 93
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-02-17T06:06:28.616816Z",
+    "agent_lines": 2383,
+    "human_added": 206,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 2589,
+    "agent_percentage": 92.04325994592507
+  },
+  "transcript_path": ".claude/projects/-Users-naokisega-src-github-com-nsega-mcp-obsidian/38163159-efca-4f00-a097-3234ceae7ed0.jsonl"
+}
