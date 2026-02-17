@@ -1,0 +1,13 @@
+All done. Here's a summary:
+
+## Completed
+
+| Step | Commit | Status |
+|------|--------|--------|
+| 1. `server.go` — accept `*slog.Logger`, pass to `ServerOptions` | `d833d91` | Pushed |
+| 2. `handler.go` — add `Logger` field, log 8 swallowed errors | `2beece1` | Pushed |
+| 3. `main.go` — replace `log`/`fmt` with `slog.TextHandler` | `be1e1b2` | Pushed |
+| 4. `handler_test.go` — pass discard logger | `67e90e9` | Pushed |
+| 5. Verify — build, test -race, vet | All pass | 40/40 tests green |
+
+**PR:** https://github.com/nsega/mcp-obsidian/pull/13
