@@ -310,7 +310,7 @@ func (h *Handler) DeleteNote(ctx context.Context, req *mcp.CallToolRequest, inpu
 		return nil, note.DeleteNoteOutput{}, fmt.Errorf("failed to delete file: %w", err)
 	}
 
-	output := note.DeleteNoteOutput{Path: input.Path}
+	output := note.DeleteNoteOutput(input)
 	result := &mcp.CallToolResult{
 		Content: []mcp.Content{
 			&mcp.TextContent{Text: fmt.Sprintf("Deleted note: %s", input.Path)},
