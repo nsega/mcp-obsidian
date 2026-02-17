@@ -1,0 +1,33 @@
+{
+  "cli_version": "0.4.4",
+  "checkpoint_id": "d17b708d6319",
+  "session_id": "38163159-efca-4f00-a097-3234ceae7ed0",
+  "strategy": "manual-commit",
+  "created_at": "2026-02-17T06:46:19.120669Z",
+  "branch": "refactor/split-main-into-internal-packages",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "README.md"
+  ],
+  "agent": "Claude Code",
+  "transcript_identifier_at_start": "89d3ef70-ef9b-4377-ae61-334592058354",
+  "checkpoint_transcript_start": 598,
+  "transcript_lines_at_start": 598,
+  "token_usage": {
+    "input_tokens": 16,
+    "cache_creation_tokens": 56632,
+    "cache_read_tokens": 833470,
+    "output_tokens": 2267,
+    "api_call_count": 12
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-02-17T06:46:18.690766Z",
+    "agent_lines": 85,
+    "human_added": 7,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 92,
+    "agent_percentage": 92.3913043478261
+  },
+  "transcript_path": ".claude/projects/-Users-naokisega-src-github-com-nsega-mcp-obsidian/38163159-efca-4f00-a097-3234ceae7ed0.jsonl"
+}

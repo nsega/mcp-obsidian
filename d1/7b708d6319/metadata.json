@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.4.4",
+  "checkpoint_id": "d17b708d6319",
+  "strategy": "manual-commit",
+  "branch": "refactor/split-main-into-internal-packages",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "README.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/d1/7b708d6319/0/metadata.json",
+      "transcript": "/d1/7b708d6319/0/full.jsonl",
+      "context": "/d1/7b708d6319/0/context.md",
+      "content_hash": "/d1/7b708d6319/0/content_hash.txt",
+      "prompt": "/d1/7b708d6319/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 16,
+    "cache_creation_tokens": 56632,
+    "cache_read_tokens": 833470,
+    "output_tokens": 2267,
+    "api_call_count": 12
+  }
+}
