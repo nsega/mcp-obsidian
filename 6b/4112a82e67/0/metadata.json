@@ -1,0 +1,23 @@
+{
+  "cli_version": "0.4.5",
+  "checkpoint_id": "6b4112a82e67",
+  "session_id": "76ccb9f3-4df5-4b00-b0a2-97a2a700c595",
+  "strategy": "auto-commit",
+  "created_at": "2026-02-23T07:55:49.127555Z",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "..gitignore.~undo-tree~",
+    ".github/workflows/build-and-test.yml",
+    "README.md",
+    "go.mod"
+  ],
+  "agent": "Claude Code",
+  "token_usage": {
+    "input_tokens": 24,
+    "cache_creation_tokens": 51275,
+    "cache_read_tokens": 1380410,
+    "output_tokens": 918,
+    "api_call_count": 22
+  }
+}
