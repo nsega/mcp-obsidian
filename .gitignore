@@ -40,3 +40,4 @@ go.work.sum
 # Claude Code – track shared settings, ignore loca
 !.claude/
 .claude/settings.local.json
+.claude/plan/
