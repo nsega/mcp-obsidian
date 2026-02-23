@@ -61,6 +61,15 @@ jobs:
         go install honnef.co/go/tools/cmd/staticcheck@latest
         staticcheck ./...
 
+    - name: Check for unmodernized code
+      run: |
+        OUTPUT=$(go fix -diff ./... 2>&1)
+        if [ -n "$OUTPUT" ]; then
+          echo "::error::go fix found unmodernized code. Run 'go fix ./...' locally and commit."
+          echo "$OUTPUT"
+          exit 1
+        fi
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
