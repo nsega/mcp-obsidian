@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -18,13 +19,16 @@ import (
 
 // Handler holds the vault reference and provides MCP tool handler methods
 type Handler struct {
-	Vault  *vault.Vault
-	Logger *slog.Logger
+	vault  *vault.Vault
+	logger *slog.Logger
 }
 
 // New creates a new Handler with the given Vault and Logger
 func New(v *vault.Vault, logger *slog.Logger) *Handler {
-	return &Handler{Vault: v, Logger: logger}
+	if logger == nil {
+		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+	}
+	return &Handler{vault: v, logger: logger}
 }
 
 // SearchNotes implements the search_notes tool
@@ -41,16 +45,16 @@ func (h *Handler) SearchNotes(ctx context.Context, req *mcp.CallToolRequest, inp
 	}
 
 	// Walk through the vault directory
-	err := filepath.Walk(h.Vault.Path, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(h.vault.Path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			h.Logger.Debug("skipping path", "path", path, "error", err)
+			h.logger.Debug("skipping path", "path", path, "error", err)
 			return nil
 		}
 
 		// Skip directories
 		if info.IsDir() {
 			// Check if directory is allowed (not hidden)
-			allowed, checkErr := h.Vault.IsPathAllowed(path)
+			allowed, checkErr := h.vault.IsPathAllowed(path)
 			if checkErr != nil || !allowed {
 				return filepath.SkipDir
 			}
@@ -63,7 +67,7 @@ func (h *Handler) SearchNotes(ctx context.Context, req *mcp.CallToolRequest, inp
 		}
 
 		// Check if file is allowed
-		allowed, checkErr := h.Vault.IsPathAllowed(path)
+		allowed, checkErr := h.vault.IsPathAllowed(path)
 		if checkErr != nil || !allowed {
 			return nil
 		}
@@ -125,7 +129,7 @@ func (h *Handler) ReadNotes(ctx context.Context, req *mcp.CallToolRequest, input
 		}
 
 		// Check if path is allowed
-		allowed, err := h.Vault.IsPathAllowed(path)
+		allowed, err := h.vault.IsPathAllowed(path)
 		if err != nil {
 			n.Error = fmt.Sprintf("Path validation error: %v", err)
 			notes = append(notes, n)
@@ -189,14 +193,14 @@ func (h *Handler) CreateNote(ctx context.Context, req *mcp.CallToolRequest, inpu
 	today := time.Now().Format("2006-01-02")
 	filename := today + "_" + slug + ".md"
 
-	dir := h.Vault.Path
+	dir := h.vault.Path
 	if input.Folder != "" {
-		dir = filepath.Join(h.Vault.Path, input.Folder)
+		dir = filepath.Join(h.vault.Path, input.Folder)
 	}
 
 	fullPath := filepath.Join(dir, filename)
 
-	allowed, err := h.Vault.IsPathAllowed(fullPath)
+	allowed, err := h.vault.IsPathAllowed(fullPath)
 	if err != nil {
 		return nil, note.CreateNoteOutput{}, fmt.Errorf("path validation error: %w", err)
 	}
@@ -240,7 +244,7 @@ func (h *Handler) CreateNote(ctx context.Context, req *mcp.CallToolRequest, inpu
 
 // UpdateNote implements the update_note tool
 func (h *Handler) UpdateNote(ctx context.Context, req *mcp.CallToolRequest, input note.UpdateNoteInput) (*mcp.CallToolResult, note.UpdateNoteOutput, error) {
-	allowed, err := h.Vault.IsPathAllowed(input.Path)
+	allowed, err := h.vault.IsPathAllowed(input.Path)
 	if err != nil {
 		return nil, note.UpdateNoteOutput{}, fmt.Errorf("path validation error: %w", err)
 	}
@@ -290,7 +294,7 @@ func (h *Handler) DeleteNote(ctx context.Context, req *mcp.CallToolRequest, inpu
 		return nil, note.DeleteNoteOutput{}, fmt.Errorf("can only delete .md files")
 	}
 
-	allowed, err := h.Vault.IsPathAllowed(input.Path)
+	allowed, err := h.vault.IsPathAllowed(input.Path)
 	if err != nil {
 		return nil, note.DeleteNoteOutput{}, fmt.Errorf("path validation error: %w", err)
 	}
@@ -335,14 +339,14 @@ func (h *Handler) SearchContent(ctx context.Context, req *mcp.CallToolRequest, i
 
 	var results []note.ContentMatch
 
-	err := filepath.Walk(h.Vault.Path, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(h.vault.Path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			h.Logger.Debug("skipping path", "path", path, "error", err)
+			h.logger.Debug("skipping path", "path", path, "error", err)
 			return nil
 		}
 
 		if info.IsDir() {
-			allowed, checkErr := h.Vault.IsPathAllowed(path)
+			allowed, checkErr := h.vault.IsPathAllowed(path)
 			if checkErr != nil || !allowed {
 				return filepath.SkipDir
 			}
@@ -353,14 +357,14 @@ func (h *Handler) SearchContent(ctx context.Context, req *mcp.CallToolRequest, i
 			return nil
 		}
 
-		allowed, checkErr := h.Vault.IsPathAllowed(path)
+		allowed, checkErr := h.vault.IsPathAllowed(path)
 		if checkErr != nil || !allowed {
 			return nil
 		}
 
 		data, err := os.ReadFile(path)
 		if err != nil {
-			h.Logger.Debug("skipping unreadable file", "path", path, "error", err)
+			h.logger.Debug("skipping unreadable file", "path", path, "error", err)
 			return nil
 		}
 
@@ -423,14 +427,14 @@ func (h *Handler) GetBacklinks(ctx context.Context, req *mcp.CallToolRequest, in
 
 	var results []note.Backlink
 
-	err := filepath.Walk(h.Vault.Path, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(h.vault.Path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			h.Logger.Debug("skipping path", "path", path, "error", err)
+			h.logger.Debug("skipping path", "path", path, "error", err)
 			return nil
 		}
 
 		if info.IsDir() {
-			allowed, checkErr := h.Vault.IsPathAllowed(path)
+			allowed, checkErr := h.vault.IsPathAllowed(path)
 			if checkErr != nil || !allowed {
 				return filepath.SkipDir
 			}
@@ -441,7 +445,7 @@ func (h *Handler) GetBacklinks(ctx context.Context, req *mcp.CallToolRequest, in
 			return nil
 		}
 
-		allowed, checkErr := h.Vault.IsPathAllowed(path)
+		allowed, checkErr := h.vault.IsPathAllowed(path)
 		if checkErr != nil || !allowed {
 			return nil
 		}
@@ -454,7 +458,7 @@ func (h *Handler) GetBacklinks(ctx context.Context, req *mcp.CallToolRequest, in
 
 		data, err := os.ReadFile(path)
 		if err != nil {
-			h.Logger.Debug("skipping unreadable file", "path", path, "error", err)
+			h.logger.Debug("skipping unreadable file", "path", path, "error", err)
 			return nil
 		}
 
@@ -508,14 +512,14 @@ func (h *Handler) ListTags(ctx context.Context, req *mcp.CallToolRequest, input 
 	// Regex for inline #tags (not inside code blocks)
 	inlineTagRe := regexp.MustCompile(`(?:^|\s)#([a-zA-Z][a-zA-Z0-9_/-]*)`)
 
-	err := filepath.Walk(h.Vault.Path, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(h.vault.Path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			h.Logger.Debug("skipping path", "path", path, "error", err)
+			h.logger.Debug("skipping path", "path", path, "error", err)
 			return nil
 		}
 
 		if info.IsDir() {
-			allowed, checkErr := h.Vault.IsPathAllowed(path)
+			allowed, checkErr := h.vault.IsPathAllowed(path)
 			if checkErr != nil || !allowed {
 				return filepath.SkipDir
 			}
@@ -526,14 +530,14 @@ func (h *Handler) ListTags(ctx context.Context, req *mcp.CallToolRequest, input 
 			return nil
 		}
 
-		allowed, checkErr := h.Vault.IsPathAllowed(path)
+		allowed, checkErr := h.vault.IsPathAllowed(path)
 		if checkErr != nil || !allowed {
 			return nil
 		}
 
 		data, err := os.ReadFile(path)
 		if err != nil {
-			h.Logger.Debug("skipping unreadable file", "path", path, "error", err)
+			h.logger.Debug("skipping unreadable file", "path", path, "error", err)
 			return nil
 		}
 
