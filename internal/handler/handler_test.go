@@ -180,7 +180,7 @@ func TestSearchNotesMaxResults(t *testing.T) {
 	}
 
 	// Create many test files to exceed MaxSearchResults
-	for i := 0; i < vault.MaxSearchResults+50; i++ {
+	for i := range vault.MaxSearchResults + 50 {
 		path := filepath.Join(manyDir, fmt.Sprintf("test-note-%d.md", i))
 		if err := os.WriteFile(path, []byte("test content"), 0644); err != nil {
 			t.Fatalf("Failed to create test file: %v", err)

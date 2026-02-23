@@ -462,8 +462,8 @@ func (h *Handler) GetBacklinks(ctx context.Context, req *mcp.CallToolRequest, in
 			return nil
 		}
 
-		lines := strings.Split(string(data), "\n")
-		for _, line := range lines {
+		lines := strings.SplitSeq(string(data), "\n")
+		for line := range lines {
 			matches := wikilinkRe.FindAllStringSubmatch(line, -1)
 			for _, match := range matches {
 				if len(match) >= 2 {

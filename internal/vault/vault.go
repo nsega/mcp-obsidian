@@ -97,8 +97,8 @@ func (v *Vault) IsPathAllowed(path string) (bool, error) {
 		return false, fmt.Errorf("failed to get relative path: %w", err)
 	}
 
-	pathParts := strings.Split(relPath, string(filepath.Separator))
-	for _, part := range pathParts {
+	pathParts := strings.SplitSeq(relPath, string(filepath.Separator))
+	for part := range pathParts {
 		if strings.HasPrefix(part, ".") && part != "." && part != ".." {
 			return false, nil
 		}

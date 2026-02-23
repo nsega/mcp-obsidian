@@ -58,11 +58,11 @@ func ParseFrontmatterTags(frontmatter string, tagCounts map[string]int) {
 		}
 
 		// Check for inline tags: tags: [tag1, tag2]
-		if strings.HasPrefix(trimmed, "tags:") {
-			rest := strings.TrimSpace(strings.TrimPrefix(trimmed, "tags:"))
+		if after, ok := strings.CutPrefix(trimmed, "tags:"); ok {
+			rest := strings.TrimSpace(after)
 			if strings.HasPrefix(rest, "[") && strings.HasSuffix(rest, "]") {
 				inner := rest[1 : len(rest)-1]
-				for _, tag := range strings.Split(inner, ",") {
+				for tag := range strings.SplitSeq(inner, ",") {
 					tag = strings.TrimSpace(tag)
 					if tag != "" {
 						tagCounts[tag]++
@@ -75,8 +75,8 @@ func ParseFrontmatterTags(frontmatter string, tagCounts map[string]int) {
 
 		// Parse block-style tag list items
 		if inTags {
-			if strings.HasPrefix(trimmed, "- ") {
-				tag := strings.TrimSpace(strings.TrimPrefix(trimmed, "- "))
+			if after, ok := strings.CutPrefix(trimmed, "- "); ok {
+				tag := strings.TrimSpace(after)
 				if tag != "" {
 					tagCounts[tag]++
 				}
