@@ -3,6 +3,8 @@ package handler
 import (
 	"context"
 	"fmt"
+	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,7 +21,8 @@ func newTestHandler(t *testing.T) (*Handler, string) {
 	t.Helper()
 	tmpVault := testutil.SetupTestVault(t)
 	v := &vault.Vault{Path: tmpVault}
-	return New(v), tmpVault
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	return New(v, logger), tmpVault
 }
 
 // TestSearchNotesHandler tests the search_notes tool

@@ -18,6 +18,7 @@ This is a Go rewrite inspired by [mcp-obsidian](https://github.com/smithery-ai/m
 - **Search Content**: Full-text search across note bodies with line numbers and snippets
 - **Get Backlinks**: Discover all `[[wikilink]]` references to a given note
 - **List Tags**: Collect and count tags from YAML frontmatter and inline `#tags`
+- **Structured Logging**: Uses Go's standard `log/slog` with leveled, key-value output to stderr
 - **Security**: Built-in path validation to prevent directory traversal and access to hidden files
 - **Performance**: Native Go static binary with zero CGO dependencies
 
@@ -247,12 +248,12 @@ The server implements several security measures:
 - **Path Validation**: All file operations are restricted to the specified vault directory
 - **Hidden Files**: Access to files and directories starting with `.` is denied
 - **Symlink Resolution**: Symlinks are resolved and validated to prevent directory escape attacks
-- **Error Handling**: Individual file read failures don't halt operations
+- **Error Handling**: Individual file read failures don't halt operations (logged at `Debug` level via `slog`)
 
 ## Project Structure
 
 ```
-main.go                     CLI entry point (~40 lines)
+main.go                     CLI entry point, slog setup, wiring
 internal/
 ├── note/
 │   ├── types.go            Input/Output structs for all 8 tools
@@ -262,10 +263,10 @@ internal/
 │   ├── vault.go            Vault struct, path validation, symlink resolution
 │   └── vault_test.go
 ├── handler/
-│   ├── handler.go          8 MCP tool handler methods
+│   ├── handler.go          8 MCP tool handler methods (with injected logger)
 │   └── handler_test.go
 ├── server/
-│   └── server.go           MCP server creation and tool registration
+│   └── server.go           MCP server creation, tool registration, logger passthrough
 └── testutil/
     └── testutil.go         Shared test vault setup/cleanup helpers
 ```
