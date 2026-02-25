@@ -1,0 +1,41 @@
+# Session Context
+
+Session ID: 55309663-921a-4426-8ee1-67c81be6a692
+Commit Message: Fix all the critical and high severity issues
+
+## Prompts
+
+### Prompt 1
+
+fix all the critical and high severity issues
+
+## Summary
+
+All green, no races. Here's a summary of all changes:
+
+---
+
+### Fix 1: Path prefix boundary check (HIGH — `vault.go:90`)
+
+**Before**: `strings.HasPrefix(cleanPath, cleanVaultPath)` — a vault at `/tmp/vault` would incorrectly allow `/tmp/vault-evil/malicious.md`.
+
+**After**: Checks exact match OR prefix with separator boundary:
+```go
+cleanPath != cleanVaultPath && !strings.HasPrefix(cleanPath, cleanVaultPath+string(filepath.Separator))
+```
+
+### Fix 2: Resolve vault path to absolute (CRITICAL — `vault.go:20-38`)
+
+**Before**: `New()` stored the path as-is after tilde expansion, potentially keeping it relative. Also only checked `os.IsNotExist`, ignoring other `os.Stat` errors, and didn't verify the path is a directory.
+
+**After**: Calls `filepath.Abs()` to guarantee an absolute path, handles all `os.Stat` errors, and rejects non-directory paths.
+
+### Fix 3: Escape user regex queries (HIGH — `handler.go:42,335`)
+
+**Before**: User-provided `query` was concatenated directly into `regexp.Compile("(?i)" + query)`, allowing regex injection and ReDoS.
+
+**After**: Uses `regexp.QuoteMeta(query)` to escape all metacharacters, ensuring queries are always treated as case-insensitive literals. Simplified the matching logic by removing the dual regex/literal code paths.
+
+### Test updates (`handler_test.go`)
+
+Two tests that relied on raw regex interpretation (`^note`, `^# Zettel \d`) were updated to verify that regex metacharacters are now correctly treated as literals.
