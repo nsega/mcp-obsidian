@@ -1,0 +1,29 @@
+All implementation is complete. Here's a summary of what was done:
+
+## Changes Made
+
+### Version Bump (Commit 1: `build:`)
+- **`go.mod`**: `go 1.25.7` → `go 1.26`
+- **`.github/workflows/build-and-test.yml`**: Go version `1.25` → `1.26` (both test and lint jobs)
+- **`README.md`**: Prerequisite `Go 1.25 or later` → `Go 1.26 or later`
+
+### `go fix` Modernizations (Commit 2: `refactor:`)
+| Analyzer | File | Transformation |
+|----------|------|---------------|
+| `stringscutprefix` | `internal/note/util.go:61` | `HasPrefix` + `TrimPrefix("tags:")` → `CutPrefix` |
+| `stringscutprefix` | `internal/note/util.go:78` | `HasPrefix` + `TrimPrefix("- ")` → `CutPrefix` |
+| `stringsseq` | `internal/note/util.go:65` | `strings.Split` in range → `strings.SplitSeq` |
+| `stringsseq` | `internal/vault/vault.go:100-101` | `strings.Split` + range → `strings.SplitSeq` |
+| `stringsseq` | `internal/handler/handler.go:465-466` | `strings.Split` + range → `strings.SplitSeq` |
+| `rangeint` | `internal/handler/handler_test.go:183` | C-style for loop → `for i := range N` |
+
+### CI Gate (Commit 3: `ci:`)
+- **`.github/workflows/build-and-test.yml`**: Added "Check for unmodernized code" step that fails CI if `go fix -diff` produces output
+
+### Verification
+- `go build ./...` — clean
+- `go vet ./...` — clean
+- `go test -v -race ./...` — all 48 tests pass
+- `go fix -diff ./...` — empty output (all modernizations applied)
+
+The changes are ready to be committed in 3 separate commits per the plan. Want me to create the commits?

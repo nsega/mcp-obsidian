@@ -1,0 +1,2 @@
+Create the pull request first, and proceed with the implementation. 
+update the plan, git commit and push the chnage step by step when each step is done.

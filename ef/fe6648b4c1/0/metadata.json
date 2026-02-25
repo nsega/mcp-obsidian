@@ -1,0 +1,31 @@
+{
+  "cli_version": "0.4.5",
+  "checkpoint_id": "effe6648b4c1",
+  "session_id": "59176511-e933-459f-83fc-e4a345233f91",
+  "strategy": "auto-commit",
+  "created_at": "2026-02-23T07:38:11.057258Z",
+  "branch": "refactor/slog-migration",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "internal/handler/handler.go"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "c5587636b4aa",
+  "transcript_identifier_at_start": "d1b72f39-7deb-484a-b840-a19f621e3d8f",
+  "checkpoint_transcript_start": 24,
+  "transcript_lines_at_start": 24,
+  "token_usage": {
+    "input_tokens": 13,
+    "cache_creation_tokens": 4657,
+    "cache_read_tokens": 343547,
+    "output_tokens": 439,
+    "api_call_count": 9,
+    "subagent_tokens": {
+      "input_tokens": 28,
+      "cache_creation_tokens": 41928,
+      "cache_read_tokens": 118754,
+      "output_tokens": 6,
+      "api_call_count": 5
+    }
+  }
+}

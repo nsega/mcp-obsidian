@@ -1,0 +1,1 @@
+yes, create the plan first and save it to .claude/plan

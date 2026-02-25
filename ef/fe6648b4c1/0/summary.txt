@@ -1,0 +1,4 @@
+Build, tests, and vet all pass. Here's what was changed in `internal/handler/handler.go`:
+
+1. **Unexported fields** — `Vault` -> `vault`, `Logger` -> `logger`. All access is internal to the package, so no external breakage.
+2. **Nil-logger guard** — `New()` now falls back to a discard logger when `nil` is passed, preventing panics from future callers.

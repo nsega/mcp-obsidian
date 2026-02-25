@@ -1,0 +1,9 @@
+Clean working tree (only untracked undo-tree files which are irrelevant). All 3 commits created successfully:
+
+```
+84eb581 ci: add go fix modernization check to CI pipeline
+6e60f44 refactor: apply go fix modernizers for Go 1.26
+fd801fd build: bump go directive to 1.26
+```
+
+The branch is 3 commits ahead of `origin/main`. The stale auto-generated commit was replaced with the 3 clean conventional commits as planned.
