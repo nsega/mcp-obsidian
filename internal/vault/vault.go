@@ -10,6 +10,12 @@ import (
 // MaxSearchResults limits the number of search results to prevent excessive output
 const MaxSearchResults = 200
 
+// MaxReadPaths limits the number of paths that can be read in a single ReadNotes call
+const MaxReadPaths = 100
+
+// MaxContentSize limits the size of note content to prevent memory/disk exhaustion (10 MB)
+const MaxContentSize = 10 * 1024 * 1024
+
 // Vault represents an Obsidian vault directory with path validation
 type Vault struct {
 	Path string // resolved absolute path to the vault root

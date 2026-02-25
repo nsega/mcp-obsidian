@@ -42,6 +42,10 @@ func (h *Handler) SearchNotes(ctx context.Context, req *mcp.CallToolRequest, inp
 
 	// Walk through the vault directory
 	err := filepath.Walk(h.vault.Path, func(path string, info os.FileInfo, err error) error {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+
 		if err != nil {
 			h.logger.Debug("skipping path", "path", path, "error", err)
 			return nil
@@ -109,6 +113,10 @@ func (h *Handler) SearchNotes(ctx context.Context, req *mcp.CallToolRequest, inp
 
 // ReadNotes implements the read_notes tool
 func (h *Handler) ReadNotes(ctx context.Context, req *mcp.CallToolRequest, input note.ReadNotesInput) (*mcp.CallToolResult, note.ReadNotesOutput, error) {
+	if len(input.Paths) > vault.MaxReadPaths {
+		return nil, note.ReadNotesOutput{}, fmt.Errorf("too many paths: %d exceeds limit of %d", len(input.Paths), vault.MaxReadPaths)
+	}
+
 	notes := make([]note.NoteContent, 0, len(input.Paths))
 
 	for _, path := range input.Paths {
@@ -173,6 +181,10 @@ func (h *Handler) CreateNote(ctx context.Context, req *mcp.CallToolRequest, inpu
 		return nil, note.CreateNoteOutput{}, fmt.Errorf("title is required")
 	}
 
+	if len(input.Content) > vault.MaxContentSize {
+		return nil, note.CreateNoteOutput{}, fmt.Errorf("content too large: %d bytes exceeds limit of %d", len(input.Content), vault.MaxContentSize)
+	}
+
 	slug := note.Slugify(input.Title)
 	if slug == "" {
 		return nil, note.CreateNoteOutput{}, fmt.Errorf("title produces an empty slug")
@@ -196,10 +208,6 @@ func (h *Handler) CreateNote(ctx context.Context, req *mcp.CallToolRequest, inpu
 		return nil, note.CreateNoteOutput{}, fmt.Errorf("access denied: path is outside vault or is a hidden file")
 	}
 
-	if _, err := os.Stat(fullPath); err == nil {
-		return nil, note.CreateNoteOutput{}, fmt.Errorf("file already exists: %s", fullPath)
-	}
-
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return nil, note.CreateNoteOutput{}, fmt.Errorf("failed to create directory: %w", err)
 	}
@@ -217,8 +225,21 @@ func (h *Handler) CreateNote(ctx context.Context, req *mcp.CallToolRequest, inpu
 		content.WriteByte('\n')
 	}
 
-	if err := os.WriteFile(fullPath, []byte(content.String()), 0644); err != nil {
-		return nil, note.CreateNoteOutput{}, fmt.Errorf("failed to write file: %w", err)
+	// Use O_CREATE|O_EXCL to atomically fail if file already exists (prevents TOCTOU)
+	f, err := os.OpenFile(fullPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+	if err != nil {
+		if os.IsExist(err) {
+			return nil, note.CreateNoteOutput{}, fmt.Errorf("file already exists: %s", fullPath)
+		}
+		return nil, note.CreateNoteOutput{}, fmt.Errorf("failed to create file: %w", err)
+	}
+	_, writeErr := f.WriteString(content.String())
+	closeErr := f.Close()
+	if writeErr != nil {
+		return nil, note.CreateNoteOutput{}, fmt.Errorf("failed to write file: %w", writeErr)
+	}
+	if closeErr != nil {
+		return nil, note.CreateNoteOutput{}, fmt.Errorf("failed to close file: %w", closeErr)
 	}
 
 	output := note.CreateNoteOutput{Path: fullPath}
@@ -232,6 +253,10 @@ func (h *Handler) CreateNote(ctx context.Context, req *mcp.CallToolRequest, inpu
 
 // UpdateNote implements the update_note tool
 func (h *Handler) UpdateNote(ctx context.Context, req *mcp.CallToolRequest, input note.UpdateNoteInput) (*mcp.CallToolResult, note.UpdateNoteOutput, error) {
+	if len(input.Content) > vault.MaxContentSize {
+		return nil, note.UpdateNoteOutput{}, fmt.Errorf("content too large: %d bytes exceeds limit of %d", len(input.Content), vault.MaxContentSize)
+	}
+
 	allowed, err := h.vault.IsPathAllowed(input.Path)
 	if err != nil {
 		return nil, note.UpdateNoteOutput{}, fmt.Errorf("path validation error: %w", err)
@@ -242,6 +267,8 @@ func (h *Handler) UpdateNote(ctx context.Context, req *mcp.CallToolRequest, inpu
 
 	if _, err := os.Stat(input.Path); os.IsNotExist(err) {
 		return nil, note.UpdateNoteOutput{}, fmt.Errorf("file does not exist: %s", input.Path)
+	} else if err != nil {
+		return nil, note.UpdateNoteOutput{}, fmt.Errorf("failed to stat file: %w", err)
 	}
 
 	mode := input.Mode
@@ -255,13 +282,17 @@ func (h *Handler) UpdateNote(ctx context.Context, req *mcp.CallToolRequest, inpu
 			return nil, note.UpdateNoteOutput{}, fmt.Errorf("failed to write file: %w", err)
 		}
 	case "append":
-		existing, err := os.ReadFile(input.Path)
+		f, err := os.OpenFile(input.Path, os.O_WRONLY|os.O_APPEND, 0644)
 		if err != nil {
-			return nil, note.UpdateNoteOutput{}, fmt.Errorf("failed to read file: %w", err)
+			return nil, note.UpdateNoteOutput{}, fmt.Errorf("failed to open file for append: %w", err)
 		}
-		newContent := string(existing) + "\n\n" + input.Content
-		if err := os.WriteFile(input.Path, []byte(newContent), 0644); err != nil {
-			return nil, note.UpdateNoteOutput{}, fmt.Errorf("failed to write file: %w", err)
+		_, writeErr := f.WriteString("\n\n" + input.Content)
+		closeErr := f.Close()
+		if writeErr != nil {
+			return nil, note.UpdateNoteOutput{}, fmt.Errorf("failed to append to file: %w", writeErr)
+		}
+		if closeErr != nil {
+			return nil, note.UpdateNoteOutput{}, fmt.Errorf("failed to close file: %w", closeErr)
 		}
 	default:
 		return nil, note.UpdateNoteOutput{}, fmt.Errorf("invalid mode: %s (must be 'replace' or 'append')", mode)
@@ -325,6 +356,10 @@ func (h *Handler) SearchContent(ctx context.Context, req *mcp.CallToolRequest, i
 	var results []note.ContentMatch
 
 	err := filepath.Walk(h.vault.Path, func(path string, info os.FileInfo, err error) error {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+
 		if err != nil {
 			h.logger.Debug("skipping path", "path", path, "error", err)
 			return nil
@@ -406,6 +441,10 @@ func (h *Handler) GetBacklinks(ctx context.Context, req *mcp.CallToolRequest, in
 	var results []note.Backlink
 
 	err := filepath.Walk(h.vault.Path, func(path string, info os.FileInfo, err error) error {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+
 		if err != nil {
 			h.logger.Debug("skipping path", "path", path, "error", err)
 			return nil
@@ -491,6 +530,10 @@ func (h *Handler) ListTags(ctx context.Context, req *mcp.CallToolRequest, input 
 	inlineTagRe := regexp.MustCompile(`(?:^|\s)#([a-zA-Z][a-zA-Z0-9_/-]*)`)
 
 	err := filepath.Walk(h.vault.Path, func(path string, info os.FileInfo, err error) error {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+
 		if err != nil {
 			h.logger.Debug("skipping path", "path", path, "error", err)
 			return nil
