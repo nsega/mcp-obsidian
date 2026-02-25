@@ -36,13 +36,9 @@ func (h *Handler) SearchNotes(ctx context.Context, req *mcp.CallToolRequest, inp
 	var results []string
 	query := input.Query
 
-	// Try to compile as regex, if it fails, use literal string matching
-	var re *regexp.Regexp
-	var useRegex bool
-	if compiled, err := regexp.Compile("(?i)" + query); err == nil {
-		re = compiled
-		useRegex = true
-	}
+	// Use case-insensitive literal matching via regexp.QuoteMeta to prevent
+	// regex injection from user-provided queries
+	re := regexp.MustCompile("(?i)" + regexp.QuoteMeta(query))
 
 	// Walk through the vault directory
 	err := filepath.Walk(h.vault.Path, func(path string, info os.FileInfo, err error) error {
@@ -75,15 +71,7 @@ func (h *Handler) SearchNotes(ctx context.Context, req *mcp.CallToolRequest, inp
 		// Get filename
 		filename := filepath.Base(path)
 
-		// Match against query
-		matched := false
-		if useRegex {
-			matched = re.MatchString(filename)
-		} else {
-			matched = strings.Contains(strings.ToLower(filename), strings.ToLower(query))
-		}
-
-		if matched {
+		if re.MatchString(filename) {
 			results = append(results, path)
 			// Limit results
 			if len(results) >= vault.MaxSearchResults {
@@ -330,12 +318,9 @@ func (h *Handler) DeleteNote(ctx context.Context, req *mcp.CallToolRequest, inpu
 func (h *Handler) SearchContent(ctx context.Context, req *mcp.CallToolRequest, input note.SearchContentInput) (*mcp.CallToolResult, note.SearchContentOutput, error) {
 	query := input.Query
 
-	var re *regexp.Regexp
-	var useRegex bool
-	if compiled, err := regexp.Compile("(?i)" + query); err == nil {
-		re = compiled
-		useRegex = true
-	}
+	// Use case-insensitive literal matching via regexp.QuoteMeta to prevent
+	// regex injection from user-provided queries
+	re := regexp.MustCompile("(?i)" + regexp.QuoteMeta(query))
 
 	var results []note.ContentMatch
 
@@ -371,14 +356,7 @@ func (h *Handler) SearchContent(ctx context.Context, req *mcp.CallToolRequest, i
 		lines := strings.Split(string(data), "\n")
 		for lineNum, line := range lines {
 
-			matched := false
-			if useRegex {
-				matched = re.MatchString(line)
-			} else {
-				matched = strings.Contains(strings.ToLower(line), strings.ToLower(query))
-			}
-
-			if matched {
+			if re.MatchString(line) {
 				results = append(results, note.ContentMatch{
 					Path:    path,
 					Snippet: line,

@@ -65,18 +65,11 @@ func TestSearchNotesHandler(t *testing.T) {
 			},
 		},
 		{
-			name: "regex search for files starting with 'note'",
+			name: "regex metacharacters are treated as literals",
 			input: note.SearchNotesInput{
 				Query: "^note",
 			},
-			wantCount: 2, // note1.md, note2.md
-			wantContains: []string{
-				"note1.md",
-				"note2.md",
-			},
-			wantNotContains: []string{
-				"nested-note.md",
-			},
+			wantCount: 0, // "^note" is not in any filename literally
 		},
 		{
 			name: "case insensitive search",
@@ -727,10 +720,9 @@ func TestSearchContentHandler(t *testing.T) {
 			wantContains: "project-plan.md",
 		},
 		{
-			name:         "regex search",
+			name:         "regex metacharacters are treated as literals",
 			query:        `^# Zettel \d`,
-			wantMinCount: 2,
-			wantContains: "zettel",
+			wantMinCount: 0, // regex metacharacters are escaped, no literal match
 		},
 		{
 			name:         "search across multiple files",

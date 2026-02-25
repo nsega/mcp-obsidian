@@ -29,9 +29,20 @@ func New(rawPath string) (*Vault, error) {
 		path = filepath.Join(home, path[1:])
 	}
 
-	// Check if vault path exists
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return nil, fmt.Errorf("vault path does not exist: %s", path)
+	// Resolve to absolute path
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve absolute path: %w", err)
+	}
+	path = absPath
+
+	// Check if vault path exists and is a directory
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, fmt.Errorf("vault path error: %w", err)
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("vault path is not a directory: %s", path)
 	}
 
 	return &Vault{Path: path}, nil
@@ -86,8 +97,9 @@ func (v *Vault) IsPathAllowed(path string) (bool, error) {
 	cleanPath := filepath.Clean(resolvedPath)
 	cleanVaultPath := filepath.Clean(resolvedVaultPath)
 
-	// Check if path is within vault
-	if !strings.HasPrefix(cleanPath, cleanVaultPath) {
+	// Check if path is within vault (ensure separator boundary to prevent
+	// prefix false-positives like /tmp/vault matching /tmp/vault-evil)
+	if cleanPath != cleanVaultPath && !strings.HasPrefix(cleanPath, cleanVaultPath+string(filepath.Separator)) {
 		return false, nil
 	}
 
