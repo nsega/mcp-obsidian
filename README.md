@@ -6,7 +6,7 @@
 
 A Model Context Protocol (MCP) server for managing Markdown notes in Obsidian vaults with full Zettelkasten workflow support.
 
-This is a Go rewrite inspired by [mcp-obsidian](https://github.com/smithery-ai/mcp-obsidian) using the [MCP Go SDK v1.3](https://github.com/modelcontextprotocol/go-sdk).
+This is a Go rewrite inspired by [mcp-obsidian](https://github.com/smithery-ai/mcp-obsidian) using the [MCP Go SDK v1.4](https://github.com/modelcontextprotocol/go-sdk).
 
 ## Features
 
