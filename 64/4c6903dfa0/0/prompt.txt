@@ -1,0 +1,6 @@
+upgrade modelcontextprotocol/go-sdk to v1.4.0 https://github.com/modelcontextprotocol/go-sdk/releases/tag/v1.4.0
+also, CI job failed at the last commit. Please fix them.
+
+---
+
+create the pull request and commit these cnages and push them
