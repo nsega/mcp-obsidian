@@ -208,7 +208,7 @@ func (h *Handler) CreateNote(ctx context.Context, req *mcp.CallToolRequest, inpu
 		return nil, note.CreateNoteOutput{}, fmt.Errorf("access denied: path is outside vault or is a hidden file")
 	}
 
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err = os.MkdirAll(dir, 0755); err != nil {
 		return nil, note.CreateNoteOutput{}, fmt.Errorf("failed to create directory: %w", err)
 	}
 
