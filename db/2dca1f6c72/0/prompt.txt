@@ -1,0 +1,5 @@
+upgrade go version to 1.26.1 . after that, make sure all test and ci passes. update README to the latest.
+
+---
+
+how about github ci job?
