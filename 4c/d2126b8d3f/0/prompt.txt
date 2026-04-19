@@ -1,0 +1,9 @@
+upgrade go-sdk to v1.5.0 https://github.com/modelcontextprotocol/go-sdk/releases/tag/v1.5.0
+
+---
+
+Ensure lint, tests, build, and ci-jobs pass successfully.
+
+---
+
+upgrade go version 1.26.1 to 1.26.2
