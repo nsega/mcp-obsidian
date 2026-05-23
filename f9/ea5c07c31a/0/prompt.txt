@@ -1,0 +1,5 @@
+upgrade modelcontextprotocol/go-sdk to https://github.com/modelcontextprotocol/go-sdk/releases/tag/v1.6.1
+
+---
+
+make sure ci and test passes
