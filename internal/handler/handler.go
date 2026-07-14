@@ -31,6 +31,15 @@ func New(v *vault.Vault, logger *slog.Logger) *Handler {
 	return &Handler{vault: v, logger: logger}
 }
 
+// textResult wraps a plain text message in a CallToolResult.
+func textResult(text string) *mcp.CallToolResult {
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			&mcp.TextContent{Text: text},
+		},
+	}
+}
+
 // SearchNotes implements the search_notes tool
 func (h *Handler) SearchNotes(ctx context.Context, req *mcp.CallToolRequest, input note.SearchNotesInput) (*mcp.CallToolResult, note.SearchNotesOutput, error) {
 	var results []string
@@ -100,15 +109,7 @@ func (h *Handler) SearchNotes(ctx context.Context, req *mcp.CallToolRequest, inp
 		textContent += ":\n" + strings.Join(results, "\n")
 	}
 
-	result := &mcp.CallToolResult{
-		Content: []mcp.Content{
-			&mcp.TextContent{
-				Text: textContent,
-			},
-		},
-	}
-
-	return result, output, nil
+	return textResult(textContent), output, nil
 }
 
 // ReadNotes implements the read_notes tool
@@ -164,15 +165,7 @@ func (h *Handler) ReadNotes(ctx context.Context, req *mcp.CallToolRequest, input
 		}
 	}
 
-	result := &mcp.CallToolResult{
-		Content: []mcp.Content{
-			&mcp.TextContent{
-				Text: strings.Join(textParts, "\n\n"),
-			},
-		},
-	}
-
-	return result, output, nil
+	return textResult(strings.Join(textParts, "\n\n")), output, nil
 }
 
 // CreateNote implements the create_note tool
@@ -243,12 +236,7 @@ func (h *Handler) CreateNote(ctx context.Context, req *mcp.CallToolRequest, inpu
 	}
 
 	output := note.CreateNoteOutput{Path: fullPath}
-	result := &mcp.CallToolResult{
-		Content: []mcp.Content{
-			&mcp.TextContent{Text: fmt.Sprintf("Created note: %s", fullPath)},
-		},
-	}
-	return result, output, nil
+	return textResult(fmt.Sprintf("Created note: %s", fullPath)), output, nil
 }
 
 // UpdateNote implements the update_note tool
@@ -299,12 +287,7 @@ func (h *Handler) UpdateNote(ctx context.Context, req *mcp.CallToolRequest, inpu
 	}
 
 	output := note.UpdateNoteOutput{Path: input.Path}
-	result := &mcp.CallToolResult{
-		Content: []mcp.Content{
-			&mcp.TextContent{Text: fmt.Sprintf("Updated note (%s): %s", mode, input.Path)},
-		},
-	}
-	return result, output, nil
+	return textResult(fmt.Sprintf("Updated note (%s): %s", mode, input.Path)), output, nil
 }
 
 // DeleteNote implements the delete_note tool
@@ -337,12 +320,7 @@ func (h *Handler) DeleteNote(ctx context.Context, req *mcp.CallToolRequest, inpu
 	}
 
 	output := note.DeleteNoteOutput(input)
-	result := &mcp.CallToolResult{
-		Content: []mcp.Content{
-			&mcp.TextContent{Text: fmt.Sprintf("Deleted note: %s", input.Path)},
-		},
-	}
-	return result, output, nil
+	return textResult(fmt.Sprintf("Deleted note: %s", input.Path)), output, nil
 }
 
 // SearchContent implements the search_content tool
@@ -421,12 +399,7 @@ func (h *Handler) SearchContent(ctx context.Context, req *mcp.CallToolRequest, i
 		textContent += ":\n" + strings.Join(lines, "\n")
 	}
 
-	result := &mcp.CallToolResult{
-		Content: []mcp.Content{
-			&mcp.TextContent{Text: textContent},
-		},
-	}
-	return result, output, nil
+	return textResult(textContent), output, nil
 }
 
 // GetBacklinks implements the get_backlinks tool
@@ -514,12 +487,7 @@ func (h *Handler) GetBacklinks(ctx context.Context, req *mcp.CallToolRequest, in
 		textContent += ":\n" + strings.Join(lines, "\n")
 	}
 
-	result := &mcp.CallToolResult{
-		Content: []mcp.Content{
-			&mcp.TextContent{Text: textContent},
-		},
-	}
-	return result, output, nil
+	return textResult(textContent), output, nil
 }
 
 // ListTags implements the list_tags tool
@@ -621,10 +589,5 @@ func (h *Handler) ListTags(ctx context.Context, req *mcp.CallToolRequest, input 
 		textContent += ":\n" + strings.Join(lines, "\n")
 	}
 
-	result := &mcp.CallToolResult{
-		Content: []mcp.Content{
-			&mcp.TextContent{Text: textContent},
-		},
-	}
-	return result, output, nil
+	return textResult(textContent), output, nil
 }
