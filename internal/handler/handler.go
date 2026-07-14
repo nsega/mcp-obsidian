@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/fs"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -40,17 +41,13 @@ func textResult(text string) *mcp.CallToolResult {
 	}
 }
 
-// SearchNotes implements the search_notes tool
-func (h *Handler) SearchNotes(ctx context.Context, req *mcp.CallToolRequest, input note.SearchNotesInput) (*mcp.CallToolResult, note.SearchNotesOutput, error) {
-	var results []string
-	query := input.Query
-
-	// Use case-insensitive literal matching via regexp.QuoteMeta to prevent
-	// regex injection from user-provided queries
-	re := regexp.MustCompile("(?i)" + regexp.QuoteMeta(query))
-
-	// Walk through the vault directory
-	err := filepath.Walk(h.vault.Path, func(path string, info os.FileInfo, err error) error {
+// walkMarkdownFiles walks the vault and invokes fn for every allowed markdown
+// file. It owns context cancellation, walk-error skipping, hidden-directory
+// pruning, the .md filter, and per-file permission checks, so tool handlers
+// only implement their per-file logic. Errors returned by fn, including
+// filepath.SkipAll for result limits, propagate to the walk.
+func (h *Handler) walkMarkdownFiles(ctx context.Context, fn func(path string) error) error {
+	return filepath.WalkDir(h.vault.Path, func(path string, d fs.DirEntry, err error) error {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
@@ -60,8 +57,7 @@ func (h *Handler) SearchNotes(ctx context.Context, req *mcp.CallToolRequest, inp
 			return nil
 		}
 
-		// Skip directories
-		if info.IsDir() {
+		if d.IsDir() {
 			// Check if directory is allowed (not hidden)
 			allowed, checkErr := h.vault.IsPathAllowed(path)
 			if checkErr != nil || !allowed {
@@ -81,20 +77,28 @@ func (h *Handler) SearchNotes(ctx context.Context, req *mcp.CallToolRequest, inp
 			return nil
 		}
 
-		// Get filename
-		filename := filepath.Base(path)
+		return fn(path)
+	})
+}
 
-		if re.MatchString(filename) {
+// SearchNotes implements the search_notes tool
+func (h *Handler) SearchNotes(ctx context.Context, req *mcp.CallToolRequest, input note.SearchNotesInput) (*mcp.CallToolResult, note.SearchNotesOutput, error) {
+	var results []string
+
+	// Use case-insensitive literal matching via regexp.QuoteMeta to prevent
+	// regex injection from user-provided queries
+	re := regexp.MustCompile("(?i)" + regexp.QuoteMeta(input.Query))
+
+	err := h.walkMarkdownFiles(ctx, func(path string) error {
+		if re.MatchString(filepath.Base(path)) {
 			results = append(results, path)
 			// Limit results
 			if len(results) >= vault.MaxSearchResults {
 				return filepath.SkipAll
 			}
 		}
-
 		return nil
 	})
-
 	if err != nil {
 		return nil, note.SearchNotesOutput{}, fmt.Errorf("failed to search notes: %w", err)
 	}
@@ -103,7 +107,6 @@ func (h *Handler) SearchNotes(ctx context.Context, req *mcp.CallToolRequest, inp
 		Results: results,
 	}
 
-	// Create text content for the result
 	textContent := fmt.Sprintf("Found %d matching notes", len(results))
 	if len(results) > 0 {
 		textContent += ":\n" + strings.Join(results, "\n")
