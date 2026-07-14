@@ -10,14 +10,14 @@
       "metadata": "/78/e8efb8cacd/0/metadata.json",
       "transcript": "/78/e8efb8cacd/0/full.jsonl",
       "content_hash": "/78/e8efb8cacd/0/content_hash.txt",
-      "prompt": ""
+      "prompt": "/78/e8efb8cacd/0/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 82,
-    "cache_creation_tokens": 190357,
-    "cache_read_tokens": 4309752,
-    "output_tokens": 47603,
-    "api_call_count": 43
+    "input_tokens": 96,
+    "cache_creation_tokens": 361287,
+    "cache_read_tokens": 5235705,
+    "output_tokens": 56315,
+    "api_call_count": 51
   }
 }
