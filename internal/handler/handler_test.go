@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -916,4 +917,20 @@ func TestListTagsHandler(t *testing.T) {
 			t.Errorf("expected 0 tags, got %d", len(output.Tags))
 		}
 	})
+}
+
+// TestReadNotesContextCancelled verifies ReadNotes aborts on a cancelled context
+func TestReadNotesContextCancelled(t *testing.T) {
+	h, tmpVault := newTestHandler(t)
+	defer testutil.CleanupTestVault(t, tmpVault)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, _, err := h.ReadNotes(ctx, nil, note.ReadNotesInput{
+		Paths: []string{filepath.Join(tmpVault, "note1.md")},
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("expected context.Canceled, got %v", err)
+	}
 }

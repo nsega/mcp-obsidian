@@ -124,6 +124,10 @@ func (h *Handler) ReadNotes(ctx context.Context, req *mcp.CallToolRequest, input
 	notes := make([]note.NoteContent, 0, len(input.Paths))
 
 	for _, path := range input.Paths {
+		if err := ctx.Err(); err != nil {
+			return nil, note.ReadNotesOutput{}, err
+		}
+
 		n := note.NoteContent{
 			Path: path,
 		}
