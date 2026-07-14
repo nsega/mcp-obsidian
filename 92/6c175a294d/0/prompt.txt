@@ -1,0 +1,5 @@
+We’ve accumulated a massive amount of technical debt in this codebase over time. I need you to draft a detailed plan to fully refactor it in stages.
+
+---
+
+This design look right to me. Must check regression by using test and GitHub Action CI jobs
