@@ -1,0 +1,1 @@
+reviewed the spec. it looks good to me. move on to writing the detailed implementation plan
