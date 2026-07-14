@@ -328,41 +328,13 @@ func (h *Handler) DeleteNote(ctx context.Context, req *mcp.CallToolRequest, inpu
 
 // SearchContent implements the search_content tool
 func (h *Handler) SearchContent(ctx context.Context, req *mcp.CallToolRequest, input note.SearchContentInput) (*mcp.CallToolResult, note.SearchContentOutput, error) {
-	query := input.Query
-
 	// Use case-insensitive literal matching via regexp.QuoteMeta to prevent
 	// regex injection from user-provided queries
-	re := regexp.MustCompile("(?i)" + regexp.QuoteMeta(query))
+	re := regexp.MustCompile("(?i)" + regexp.QuoteMeta(input.Query))
 
 	var results []note.ContentMatch
 
-	err := filepath.Walk(h.vault.Path, func(path string, info os.FileInfo, err error) error {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-
-		if err != nil {
-			h.logger.Debug("skipping path", "path", path, "error", err)
-			return nil
-		}
-
-		if info.IsDir() {
-			allowed, checkErr := h.vault.IsPathAllowed(path)
-			if checkErr != nil || !allowed {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-
-		if !strings.HasSuffix(strings.ToLower(path), ".md") {
-			return nil
-		}
-
-		allowed, checkErr := h.vault.IsPathAllowed(path)
-		if checkErr != nil || !allowed {
-			return nil
-		}
-
+	err := h.walkMarkdownFiles(ctx, func(path string) error {
 		data, err := os.ReadFile(path)
 		if err != nil {
 			h.logger.Debug("skipping unreadable file", "path", path, "error", err)
@@ -371,7 +343,6 @@ func (h *Handler) SearchContent(ctx context.Context, req *mcp.CallToolRequest, i
 
 		lines := strings.Split(string(data), "\n")
 		for lineNum, line := range lines {
-
 			if re.MatchString(line) {
 				results = append(results, note.ContentMatch{
 					Path:    path,
@@ -383,10 +354,8 @@ func (h *Handler) SearchContent(ctx context.Context, req *mcp.CallToolRequest, i
 				}
 			}
 		}
-
 		return nil
 	})
-
 	if err != nil {
 		return nil, note.SearchContentOutput{}, fmt.Errorf("failed to search content: %w", err)
 	}
@@ -416,33 +385,7 @@ func (h *Handler) GetBacklinks(ctx context.Context, req *mcp.CallToolRequest, in
 
 	var results []note.Backlink
 
-	err := filepath.Walk(h.vault.Path, func(path string, info os.FileInfo, err error) error {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-
-		if err != nil {
-			h.logger.Debug("skipping path", "path", path, "error", err)
-			return nil
-		}
-
-		if info.IsDir() {
-			allowed, checkErr := h.vault.IsPathAllowed(path)
-			if checkErr != nil || !allowed {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-
-		if !strings.HasSuffix(strings.ToLower(path), ".md") {
-			return nil
-		}
-
-		allowed, checkErr := h.vault.IsPathAllowed(path)
-		if checkErr != nil || !allowed {
-			return nil
-		}
-
+	err := h.walkMarkdownFiles(ctx, func(path string) error {
 		// Exclude the target note itself
 		baseName := strings.TrimSuffix(filepath.Base(path), ".md")
 		if strings.EqualFold(baseName, noteName) {
@@ -471,10 +414,8 @@ func (h *Handler) GetBacklinks(ctx context.Context, req *mcp.CallToolRequest, in
 				}
 			}
 		}
-
 		return nil
 	})
-
 	if err != nil {
 		return nil, note.GetBacklinksOutput{}, fmt.Errorf("failed to search backlinks: %w", err)
 	}
@@ -500,33 +441,7 @@ func (h *Handler) ListTags(ctx context.Context, req *mcp.CallToolRequest, input 
 	// Regex for inline #tags (not inside code blocks)
 	inlineTagRe := regexp.MustCompile(`(?:^|\s)#([a-zA-Z][a-zA-Z0-9_/-]*)`)
 
-	err := filepath.Walk(h.vault.Path, func(path string, info os.FileInfo, err error) error {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-
-		if err != nil {
-			h.logger.Debug("skipping path", "path", path, "error", err)
-			return nil
-		}
-
-		if info.IsDir() {
-			allowed, checkErr := h.vault.IsPathAllowed(path)
-			if checkErr != nil || !allowed {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-
-		if !strings.HasSuffix(strings.ToLower(path), ".md") {
-			return nil
-		}
-
-		allowed, checkErr := h.vault.IsPathAllowed(path)
-		if checkErr != nil || !allowed {
-			return nil
-		}
-
+	err := h.walkMarkdownFiles(ctx, func(path string) error {
 		data, err := os.ReadFile(path)
 		if err != nil {
 			h.logger.Debug("skipping unreadable file", "path", path, "error", err)
@@ -562,10 +477,8 @@ func (h *Handler) ListTags(ctx context.Context, req *mcp.CallToolRequest, input 
 				}
 			}
 		}
-
 		return nil
 	})
-
 	if err != nil {
 		return nil, note.ListTagsOutput{}, fmt.Errorf("failed to list tags: %w", err)
 	}
