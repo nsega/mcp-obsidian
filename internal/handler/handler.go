@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/fs"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -31,17 +32,22 @@ func New(v *vault.Vault, logger *slog.Logger) *Handler {
 	return &Handler{vault: v, logger: logger}
 }
 
-// SearchNotes implements the search_notes tool
-func (h *Handler) SearchNotes(ctx context.Context, req *mcp.CallToolRequest, input note.SearchNotesInput) (*mcp.CallToolResult, note.SearchNotesOutput, error) {
-	var results []string
-	query := input.Query
+// textResult wraps a plain text message in a CallToolResult.
+func textResult(text string) *mcp.CallToolResult {
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			&mcp.TextContent{Text: text},
+		},
+	}
+}
 
-	// Use case-insensitive literal matching via regexp.QuoteMeta to prevent
-	// regex injection from user-provided queries
-	re := regexp.MustCompile("(?i)" + regexp.QuoteMeta(query))
-
-	// Walk through the vault directory
-	err := filepath.Walk(h.vault.Path, func(path string, info os.FileInfo, err error) error {
+// walkMarkdownFiles walks the vault and invokes fn for every allowed markdown
+// file. It owns context cancellation, walk-error skipping, hidden-directory
+// pruning, the .md filter, and per-file permission checks, so tool handlers
+// only implement their per-file logic. Errors returned by fn, including
+// filepath.SkipAll for result limits, propagate to the walk.
+func (h *Handler) walkMarkdownFiles(ctx context.Context, fn func(path string) error) error {
+	return filepath.WalkDir(h.vault.Path, func(path string, d fs.DirEntry, err error) error {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
@@ -51,8 +57,7 @@ func (h *Handler) SearchNotes(ctx context.Context, req *mcp.CallToolRequest, inp
 			return nil
 		}
 
-		// Skip directories
-		if info.IsDir() {
+		if d.IsDir() {
 			// Check if directory is allowed (not hidden)
 			allowed, checkErr := h.vault.IsPathAllowed(path)
 			if checkErr != nil || !allowed {
@@ -72,20 +77,28 @@ func (h *Handler) SearchNotes(ctx context.Context, req *mcp.CallToolRequest, inp
 			return nil
 		}
 
-		// Get filename
-		filename := filepath.Base(path)
+		return fn(path)
+	})
+}
 
-		if re.MatchString(filename) {
+// SearchNotes implements the search_notes tool
+func (h *Handler) SearchNotes(ctx context.Context, req *mcp.CallToolRequest, input note.SearchNotesInput) (*mcp.CallToolResult, note.SearchNotesOutput, error) {
+	var results []string
+
+	// Use case-insensitive literal matching via regexp.QuoteMeta to prevent
+	// regex injection from user-provided queries
+	re := regexp.MustCompile("(?i)" + regexp.QuoteMeta(input.Query))
+
+	err := h.walkMarkdownFiles(ctx, func(path string) error {
+		if re.MatchString(filepath.Base(path)) {
 			results = append(results, path)
 			// Limit results
 			if len(results) >= vault.MaxSearchResults {
 				return filepath.SkipAll
 			}
 		}
-
 		return nil
 	})
-
 	if err != nil {
 		return nil, note.SearchNotesOutput{}, fmt.Errorf("failed to search notes: %w", err)
 	}
@@ -94,21 +107,12 @@ func (h *Handler) SearchNotes(ctx context.Context, req *mcp.CallToolRequest, inp
 		Results: results,
 	}
 
-	// Create text content for the result
 	textContent := fmt.Sprintf("Found %d matching notes", len(results))
 	if len(results) > 0 {
 		textContent += ":\n" + strings.Join(results, "\n")
 	}
 
-	result := &mcp.CallToolResult{
-		Content: []mcp.Content{
-			&mcp.TextContent{
-				Text: textContent,
-			},
-		},
-	}
-
-	return result, output, nil
+	return textResult(textContent), output, nil
 }
 
 // ReadNotes implements the read_notes tool
@@ -120,6 +124,10 @@ func (h *Handler) ReadNotes(ctx context.Context, req *mcp.CallToolRequest, input
 	notes := make([]note.NoteContent, 0, len(input.Paths))
 
 	for _, path := range input.Paths {
+		if err := ctx.Err(); err != nil {
+			return nil, note.ReadNotesOutput{}, err
+		}
+
 		n := note.NoteContent{
 			Path: path,
 		}
@@ -164,15 +172,7 @@ func (h *Handler) ReadNotes(ctx context.Context, req *mcp.CallToolRequest, input
 		}
 	}
 
-	result := &mcp.CallToolResult{
-		Content: []mcp.Content{
-			&mcp.TextContent{
-				Text: strings.Join(textParts, "\n\n"),
-			},
-		},
-	}
-
-	return result, output, nil
+	return textResult(strings.Join(textParts, "\n\n")), output, nil
 }
 
 // CreateNote implements the create_note tool
@@ -243,12 +243,7 @@ func (h *Handler) CreateNote(ctx context.Context, req *mcp.CallToolRequest, inpu
 	}
 
 	output := note.CreateNoteOutput{Path: fullPath}
-	result := &mcp.CallToolResult{
-		Content: []mcp.Content{
-			&mcp.TextContent{Text: fmt.Sprintf("Created note: %s", fullPath)},
-		},
-	}
-	return result, output, nil
+	return textResult(fmt.Sprintf("Created note: %s", fullPath)), output, nil
 }
 
 // UpdateNote implements the update_note tool
@@ -299,12 +294,7 @@ func (h *Handler) UpdateNote(ctx context.Context, req *mcp.CallToolRequest, inpu
 	}
 
 	output := note.UpdateNoteOutput{Path: input.Path}
-	result := &mcp.CallToolResult{
-		Content: []mcp.Content{
-			&mcp.TextContent{Text: fmt.Sprintf("Updated note (%s): %s", mode, input.Path)},
-		},
-	}
-	return result, output, nil
+	return textResult(fmt.Sprintf("Updated note (%s): %s", mode, input.Path)), output, nil
 }
 
 // DeleteNote implements the delete_note tool
@@ -337,51 +327,18 @@ func (h *Handler) DeleteNote(ctx context.Context, req *mcp.CallToolRequest, inpu
 	}
 
 	output := note.DeleteNoteOutput(input)
-	result := &mcp.CallToolResult{
-		Content: []mcp.Content{
-			&mcp.TextContent{Text: fmt.Sprintf("Deleted note: %s", input.Path)},
-		},
-	}
-	return result, output, nil
+	return textResult(fmt.Sprintf("Deleted note: %s", input.Path)), output, nil
 }
 
 // SearchContent implements the search_content tool
 func (h *Handler) SearchContent(ctx context.Context, req *mcp.CallToolRequest, input note.SearchContentInput) (*mcp.CallToolResult, note.SearchContentOutput, error) {
-	query := input.Query
-
 	// Use case-insensitive literal matching via regexp.QuoteMeta to prevent
 	// regex injection from user-provided queries
-	re := regexp.MustCompile("(?i)" + regexp.QuoteMeta(query))
+	re := regexp.MustCompile("(?i)" + regexp.QuoteMeta(input.Query))
 
 	var results []note.ContentMatch
 
-	err := filepath.Walk(h.vault.Path, func(path string, info os.FileInfo, err error) error {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-
-		if err != nil {
-			h.logger.Debug("skipping path", "path", path, "error", err)
-			return nil
-		}
-
-		if info.IsDir() {
-			allowed, checkErr := h.vault.IsPathAllowed(path)
-			if checkErr != nil || !allowed {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-
-		if !strings.HasSuffix(strings.ToLower(path), ".md") {
-			return nil
-		}
-
-		allowed, checkErr := h.vault.IsPathAllowed(path)
-		if checkErr != nil || !allowed {
-			return nil
-		}
-
+	err := h.walkMarkdownFiles(ctx, func(path string) error {
 		data, err := os.ReadFile(path)
 		if err != nil {
 			h.logger.Debug("skipping unreadable file", "path", path, "error", err)
@@ -390,7 +347,6 @@ func (h *Handler) SearchContent(ctx context.Context, req *mcp.CallToolRequest, i
 
 		lines := strings.Split(string(data), "\n")
 		for lineNum, line := range lines {
-
 			if re.MatchString(line) {
 				results = append(results, note.ContentMatch{
 					Path:    path,
@@ -402,10 +358,8 @@ func (h *Handler) SearchContent(ctx context.Context, req *mcp.CallToolRequest, i
 				}
 			}
 		}
-
 		return nil
 	})
-
 	if err != nil {
 		return nil, note.SearchContentOutput{}, fmt.Errorf("failed to search content: %w", err)
 	}
@@ -421,12 +375,7 @@ func (h *Handler) SearchContent(ctx context.Context, req *mcp.CallToolRequest, i
 		textContent += ":\n" + strings.Join(lines, "\n")
 	}
 
-	result := &mcp.CallToolResult{
-		Content: []mcp.Content{
-			&mcp.TextContent{Text: textContent},
-		},
-	}
-	return result, output, nil
+	return textResult(textContent), output, nil
 }
 
 // GetBacklinks implements the get_backlinks tool
@@ -440,33 +389,7 @@ func (h *Handler) GetBacklinks(ctx context.Context, req *mcp.CallToolRequest, in
 
 	var results []note.Backlink
 
-	err := filepath.Walk(h.vault.Path, func(path string, info os.FileInfo, err error) error {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-
-		if err != nil {
-			h.logger.Debug("skipping path", "path", path, "error", err)
-			return nil
-		}
-
-		if info.IsDir() {
-			allowed, checkErr := h.vault.IsPathAllowed(path)
-			if checkErr != nil || !allowed {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-
-		if !strings.HasSuffix(strings.ToLower(path), ".md") {
-			return nil
-		}
-
-		allowed, checkErr := h.vault.IsPathAllowed(path)
-		if checkErr != nil || !allowed {
-			return nil
-		}
-
+	err := h.walkMarkdownFiles(ctx, func(path string) error {
 		// Exclude the target note itself
 		baseName := strings.TrimSuffix(filepath.Base(path), ".md")
 		if strings.EqualFold(baseName, noteName) {
@@ -495,10 +418,8 @@ func (h *Handler) GetBacklinks(ctx context.Context, req *mcp.CallToolRequest, in
 				}
 			}
 		}
-
 		return nil
 	})
-
 	if err != nil {
 		return nil, note.GetBacklinksOutput{}, fmt.Errorf("failed to search backlinks: %w", err)
 	}
@@ -514,12 +435,7 @@ func (h *Handler) GetBacklinks(ctx context.Context, req *mcp.CallToolRequest, in
 		textContent += ":\n" + strings.Join(lines, "\n")
 	}
 
-	result := &mcp.CallToolResult{
-		Content: []mcp.Content{
-			&mcp.TextContent{Text: textContent},
-		},
-	}
-	return result, output, nil
+	return textResult(textContent), output, nil
 }
 
 // ListTags implements the list_tags tool
@@ -529,33 +445,7 @@ func (h *Handler) ListTags(ctx context.Context, req *mcp.CallToolRequest, input 
 	// Regex for inline #tags (not inside code blocks)
 	inlineTagRe := regexp.MustCompile(`(?:^|\s)#([a-zA-Z][a-zA-Z0-9_/-]*)`)
 
-	err := filepath.Walk(h.vault.Path, func(path string, info os.FileInfo, err error) error {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-
-		if err != nil {
-			h.logger.Debug("skipping path", "path", path, "error", err)
-			return nil
-		}
-
-		if info.IsDir() {
-			allowed, checkErr := h.vault.IsPathAllowed(path)
-			if checkErr != nil || !allowed {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-
-		if !strings.HasSuffix(strings.ToLower(path), ".md") {
-			return nil
-		}
-
-		allowed, checkErr := h.vault.IsPathAllowed(path)
-		if checkErr != nil || !allowed {
-			return nil
-		}
-
+	err := h.walkMarkdownFiles(ctx, func(path string) error {
 		data, err := os.ReadFile(path)
 		if err != nil {
 			h.logger.Debug("skipping unreadable file", "path", path, "error", err)
@@ -591,10 +481,8 @@ func (h *Handler) ListTags(ctx context.Context, req *mcp.CallToolRequest, input 
 				}
 			}
 		}
-
 		return nil
 	})
-
 	if err != nil {
 		return nil, note.ListTagsOutput{}, fmt.Errorf("failed to list tags: %w", err)
 	}
@@ -621,10 +509,5 @@ func (h *Handler) ListTags(ctx context.Context, req *mcp.CallToolRequest, input 
 		textContent += ":\n" + strings.Join(lines, "\n")
 	}
 
-	result := &mcp.CallToolResult{
-		Content: []mcp.Content{
-			&mcp.TextContent{Text: textContent},
-		},
-	}
-	return result, output, nil
+	return textResult(textContent), output, nil
 }
