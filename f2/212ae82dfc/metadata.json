@@ -1,0 +1,27 @@
+{
+  "cli_version": "0.10.3",
+  "checkpoint_id": "f2212ae82dfc",
+  "strategy": "manual-commit",
+  "branch": "chore/upgrade-go-1.27-and-deps",
+  "checkpoints_count": 2,
+  "files_touched": [
+    ".github/workflows/build-and-test.yml",
+    "Makefile"
+  ],
+  "sessions": [
+    {
+      "metadata": "/f2/212ae82dfc/0/metadata.json",
+      "transcript": "/f2/212ae82dfc/0/full.jsonl",
+      "compact_transcript": "/f2/212ae82dfc/0/transcript.jsonl",
+      "content_hash": "/f2/212ae82dfc/0/content_hash.txt",
+      "prompt": "/f2/212ae82dfc/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 58,
+    "cache_creation_tokens": 35152,
+    "cache_read_tokens": 3420815,
+    "output_tokens": 19339,
+    "api_call_count": 29
+  }
+}
