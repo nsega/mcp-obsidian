@@ -9,9 +9,11 @@ GO_MOD=$(GO_CMD) mod
 GO_VET=$(GO_CMD) vet
 GO_FMT=$(GO_CMD) fmt
 
-# Tool versions. Keep GOLANGCI_LINT_VERSION in sync with the workflow's
-# GOLANGCI_LINT_VERSION, minus the leading "v" (it is compared with sort -V against
-# `golangci-lint version --short`, which prints no prefix).
+# Tool versions. This is the single source of truth for the golangci-lint pin:
+# CI reads it via `make print-golangci-lint-version`. No leading "v" - it is compared
+# with sort -V against `golangci-lint version --short`, which prints no prefix.
+# golangci-lint cannot lint a module targeting a newer Go than it was built with, so
+# raising the go directive in go.mod may require raising this too.
 GO_VERSION=$(shell sed -n 's/^go //p' go.mod)
 GOLANGCI_LINT_VERSION=2.13.2
 
@@ -24,7 +26,7 @@ LDFLAGS=-ldflags "-X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIME)"
 BUILD_DIR=build
 COVERAGE_DIR=coverage
 
-.PHONY: all build clean test lint fmt vet deps help install run check coverage tidy verify
+.PHONY: all build clean test lint fmt vet deps help install run check coverage tidy verify print-golangci-lint-version
 
 # Default target
 all: check build
@@ -94,6 +96,14 @@ lint:
 	@echo "Running linters..."
 	@if command -v golangci-lint >/dev/null 2>&1; then \
 		installed=$$(golangci-lint version --short 2>/dev/null); \
+		case "$$installed" in \
+			''|*[!0-9.]*) \
+				echo "Could not read a version number from 'golangci-lint version --short' (got: '$$installed')."; \
+				echo "This module needs golangci-lint $(GOLANGCI_LINT_VERSION) or newer, built with Go $(GO_VERSION) or newer."; \
+				echo "Check your install: https://golangci-lint.run/docs/welcome/install/"; \
+				exit 1; \
+				;; \
+		esac; \
 		oldest=$$(printf '%s\n%s\n' "$(GOLANGCI_LINT_VERSION)" "$$installed" | sort -V | head -1); \
 		if [ "$$oldest" != "$(GOLANGCI_LINT_VERSION)" ]; then \
 			echo "golangci-lint $$installed is too old. It is built with an older Go than the $(GO_VERSION)"; \
@@ -107,6 +117,10 @@ lint:
 		echo "Running basic checks instead..."; \
 		$(MAKE) fmt vet; \
 	fi
+
+## print-golangci-lint-version: Print the pinned golangci-lint version (read by CI)
+print-golangci-lint-version:
+	@echo $(GOLANGCI_LINT_VERSION)
 
 ## check: Run all checks (fmt, vet, lint, test)
 check: fmt vet lint test

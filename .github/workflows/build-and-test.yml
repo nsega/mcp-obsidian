@@ -6,9 +6,10 @@ on:
   pull_request:
     branches: [ main, master ]
 
-# Keep this in sync with the version pinned in the Makefile.
 env:
-  GOLANGCI_LINT_VERSION: v2.13.2
+  # staticcheck must be pinned rather than @latest: setup-go v6+ exports
+  # GOTOOLCHAIN=local, so an upstream go directive above ours would fail the build.
+  # Its floor is tied to the go directive in go.mod - bump both together.
   STATICCHECK_VERSION: v0.8.1
 
 jobs:
@@ -22,23 +23,13 @@ jobs:
 
     # go-version-file keeps the toolchain tied to go.mod. setup-go v6+ exports
     # GOTOOLCHAIN=local, so a hard-coded version here would have to be bumped in
-    # lockstep with go.mod or the build fails.
+    # lockstep with go.mod or the build fails. Module and build caches come from
+    # setup-go's own cache (on by default) - a second actions/cache step over the
+    # same paths collides with it on restore.
     - name: Set up Go
-      id: setup-go
       uses: actions/setup-go@v7
       with:
         go-version-file: go.mod
-
-    - name: Cache Go modules
-      uses: actions/cache@v6
-      with:
-        path: |
-          ~/go/pkg/mod
-          ~/.cache/go-build
-        key: ${{ runner.os }}-go-${{ steps.setup-go.outputs.go-version }}-${{ hashFiles('**/go.sum') }}
-        restore-keys: |
-          ${{ runner.os }}-go-${{ steps.setup-go.outputs.go-version }}-
-          ${{ runner.os }}-go-
 
     - name: Download dependencies
       run: go mod download
@@ -59,9 +50,12 @@ jobs:
         flags: unittests
         fail_ci_if_error: false
 
+    # `go fix -diff` exits 1 when it has a diff to report, and the default shell
+    # is `bash -e`, so the assignment needs `|| true` or the step dies before it
+    # can print the diff and the annotation.
     - name: Check go fix modernizers
       run: |
-        diff=$(go fix -diff ./... 2>&1)
+        diff=$(go fix -diff ./... 2>&1) || true
         if [ -n "$diff" ]; then
           echo "$diff"
           echo "::error::go fix found unmodernized code. Run 'go fix ./...' and commit the changes."
@@ -89,10 +83,15 @@ jobs:
       with:
         go-version-file: go.mod
 
-    # golangci-lint refuses to load a module whose Go version is newer than the
-    # one it was built with, so this pin has a floor set by go.mod.
+    # The Makefile owns this pin so `make lint` and CI cannot drift apart.
+    # golangci-lint refuses to load a module whose Go version is newer than the one
+    # it was built with, so its floor is tied to the go directive in go.mod.
+    - name: Resolve pinned golangci-lint version
+      id: tools
+      run: echo "golangci_lint=v$(make -s print-golangci-lint-version)" >> "$GITHUB_OUTPUT"
+
     - name: golangci-lint
       uses: golangci/golangci-lint-action@v9
       with:
-        version: ${{ env.GOLANGCI_LINT_VERSION }}
+        version: ${{ steps.tools.outputs.golangci_lint }}
         args: --timeout=5m
