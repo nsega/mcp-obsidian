@@ -9,6 +9,12 @@ GO_MOD=$(GO_CMD) mod
 GO_VET=$(GO_CMD) vet
 GO_FMT=$(GO_CMD) fmt
 
+# Tool versions. Keep GOLANGCI_LINT_VERSION in sync with the workflow's
+# GOLANGCI_LINT_VERSION, minus the leading "v" (it is compared with sort -V against
+# `golangci-lint version --short`, which prints no prefix).
+GO_VERSION=$(shell sed -n 's/^go //p' go.mod)
+GOLANGCI_LINT_VERSION=2.13.2
+
 # Build parameters
 VERSION?=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 BUILD_TIME=$(shell date -u '+%Y-%m-%d_%H:%M:%S')
@@ -87,9 +93,17 @@ vet:
 lint:
 	@echo "Running linters..."
 	@if command -v golangci-lint >/dev/null 2>&1; then \
+		installed=$$(golangci-lint version --short 2>/dev/null); \
+		oldest=$$(printf '%s\n%s\n' "$(GOLANGCI_LINT_VERSION)" "$$installed" | sort -V | head -1); \
+		if [ "$$oldest" != "$(GOLANGCI_LINT_VERSION)" ]; then \
+			echo "golangci-lint $$installed is too old. It is built with an older Go than the $(GO_VERSION)"; \
+			echo "this module targets, so it will refuse to load the config."; \
+			echo "Upgrade to $(GOLANGCI_LINT_VERSION) or newer: https://golangci-lint.run/docs/welcome/install/"; \
+			exit 1; \
+		fi; \
 		golangci-lint run ./...; \
 	else \
-		echo "golangci-lint not installed. Install it from https://golangci-lint.run/usage/install/"; \
+		echo "golangci-lint not installed. Install $(GOLANGCI_LINT_VERSION) or newer from https://golangci-lint.run/docs/welcome/install/"; \
 		echo "Running basic checks instead..."; \
 		$(MAKE) fmt vet; \
 	fi
