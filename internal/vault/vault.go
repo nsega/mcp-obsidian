@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -134,8 +135,8 @@ func resolveWithAncestors(absPath string) string {
 		resolved, err := filepath.EvalSymlinks(current)
 		if err == nil {
 			// Found an existing ancestor — rejoin the tail
-			for i := len(tail) - 1; i >= 0; i-- {
-				resolved = filepath.Join(resolved, tail[i])
+			for _, t := range slices.Backward(tail) {
+				resolved = filepath.Join(resolved, t)
 			}
 			return resolved
 		}

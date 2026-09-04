@@ -275,7 +275,7 @@ internal/
 
 ### Prerequisites
 
-- Go 1.26.2 or later
+- Go 1.27.1 or later
 - [golangci-lint](https://golangci-lint.run/welcome/install/) (for linting)
 
 ### Build
