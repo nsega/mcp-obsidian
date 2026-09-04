@@ -1,0 +1,40 @@
+/code-review high #18
+
+---
+
+<task-notification>
+<task-id>abd23acbe7ce467e2</task-id>
+<output-file>/private/tmp/claude-501/-Users-naokisega-src-github-com-nsega-mcp-obsidian/6c98c9b8-b0eb-4824-ab1f-31229565717e/tasks/abd23acbe7ce467e2.output</output-file>
+<status>completed</status>
+<summary>Agent "/code-review high #18" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>No `ReportFindings` tool is exposed in this environment (searched; only unrelated tools matched), so I'm reporting inline.
+
+## Verification performed
+
+- `go build`, `go vet`, `go test ./...` — all pass on Go 1.27.1
+- `go mod tidy` — go.mod/go.sum already tidy
+- Downloaded the real `golangci-lint 2.13.2` release binary: `go version` → **built with go1.27.0**, so `version.Lang` = `go1.27` ≥ `TrimGoVersion("1.27.1")` = `1.27`. `config verify` clean, `run ./...` → 0 issues. The pin genuinely clears the floor created by dropping `run.go`.
+- `staticcheck@v0.8.1` installed and run → clean; its go.mod needs `go 1.26.0`, satisfied under setup-go's `GOTOOLCHAIN=local`.
+- All five bumped action major tags exist (`checkout@v7`, `setup-go@v7`, `cache@v6`, `codecov-action@v7`, `golangci-lint-action@v9`); v9 still accepts `version` and `args`; `env` context is valid in `steps.*.with`; `setup-go@v7` still exports the `go-version` output used by the cache key.
+- `internal/vault/vault.go` `slices.Backward(tail)` is exactly equivalent to the removed reverse index loop (yields values last→first; nil-safe when `tail` is empty). No bug.
+- Branch protection requires contexts `Lint` and `Build and Test`; dropping the matrix keeps the job name matching (with the matrix it would have been `Build and Test (1.26.2)`). PR checks are green.
+
+## Findings
+
+**`.github/workflows/build-and-test.yml:64` — medium: the go-fix guard's body is dead code on the failure path.**
+GitHub's default shell for `run:` is `bash -e {0}`. `go fix -diff` exits **1** when it emits a diff — I reproduced this in a scratch module with a reverse-index loop (`rc=1`, diff on stdout). So `diff=$(go fix -diff ./... 2&gt;&amp;1)` trips `set -e` and the step aborts at the assignment: `echo "$diff"` and the `::error::` annotation never run. Scenario: a contributor pushes unmodernized code and the CI log shows only `Process completed with exit code 1` with no diff and no instruction to run `go fix ./...` — precisely the output the step was rewritten to produce. Fix: `diff=$(go fix -diff ./... 2&gt;&amp;1) || true`. (The old `OUTPUT=$(...)` form had the same flaw, but the step was reworked here.)
+
+**`Makefile:96` — low: the version gate misbehaves when it can't read a version.**
+`installed=$$(golangci-lint version --short 2&gt;/dev/null)` yields an empty string if the command fails or predates `--short` (golangci-lint v1.x). `printf '%s\n%s\n' "2.13.2" ""` then sorts the empty line first, so `oldest` is empty, `!= 2.13.2`, and `make lint` dies with `golangci-lint  is too old.` — a blank version in the message. Failing is the right outcome, but the diagnostic is broken; guard with `[ -z "$installed" ]` first. Secondary: `sort -V` is a GNU/BSD extension (absent on busybox and older BSD `sort`); where it errors, `oldest` is empty and the gate rejects even an up-to-date install. (It does work on this machine's Darwin 25.6 `sort`.)
+
+**`.github/workflows/build-and-test.yml:9` — low: the sync comment is wrong for one of the two vars.**
+"Keep this in sync with the version pinned in the Makefile" sits above both `GOLANGCI_LINT_VERSION` and `STATICCHECK_VERSION`, but the Makefile pins only golangci-lint — it has no staticcheck target at all. Someone bumping `STATICCHECK_VERSION` will go looking for a Makefile counterpart that doesn't exist, and `make check` still never runs staticcheck while CI does.
+
+**`.github/workflows/build-and-test.yml:32` — low: caching is done twice over the same paths.**
+`actions/setup-go@v7` has `cache: true` by default (confirmed in its `action.yml`) and caches exactly `~/go/pkg/mod` + `~/.cache/go-build` keyed on `go.sum`, with its own `post` save step. The explicit `actions/cache@v6` step restores over the same directories and saves them again under a second key — doubled cache storage and a redundant restore/save per run. Either set `cache: false` on setup-go or drop the `Cache Go modules` step.
+
+**`README.md:279` — low: prerequisites don't state the new golangci-lint floor.**
+Removing `run.go: '1.25'` from `.golangci.yml` means golangci-lint must now be built with Go ≥ 1.27. I confirmed the locally installed 2.10.1 fails outright: `can't load config: the Go language version (go1.26) used to build golangci-lint is lower than the targeted Go version (1.27.1)`. `make lint` now hard-`exit 1`s for any contributor below 2.13.2, so `make check` breaks for them, yet the README still lists golangci-lint with no version. Add "2.13.2 or later" there. Worth noting as an ongoing cost: every future Go bump now blocks on golangci-lint shipping a build on that Go.</result>
+<usage><subagent_tokens>89952</subagent_tokens><tool_uses>28</tool_uses><duration_ms>354264</duration_ms></usage>
+</task-notification>
