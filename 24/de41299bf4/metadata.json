@@ -1,0 +1,31 @@
+{
+  "cli_version": "0.10.3",
+  "checkpoint_id": "24de41299bf4",
+  "strategy": "manual-commit",
+  "branch": "chore/upgrade-go-1.27-and-deps",
+  "checkpoints_count": 1,
+  "files_touched": [
+    ".github/workflows/build-and-test.yml",
+    ".golangci.yml",
+    "README.md",
+    "go.mod",
+    "go.sum",
+    "internal/vault/vault.go"
+  ],
+  "sessions": [
+    {
+      "metadata": "/24/de41299bf4/0/metadata.json",
+      "transcript": "/24/de41299bf4/0/full.jsonl",
+      "compact_transcript": "/24/de41299bf4/0/transcript.jsonl",
+      "content_hash": "/24/de41299bf4/0/content_hash.txt",
+      "prompt": "/24/de41299bf4/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 64,
+    "cache_creation_tokens": 60798,
+    "cache_read_tokens": 2098845,
+    "output_tokens": 17415,
+    "api_call_count": 32
+  }
+}

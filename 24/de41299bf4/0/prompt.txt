@@ -1,0 +1,3 @@
+upgrade go version, mcp/go-sdk version and libraries to the latest
+  confirm the ci pass as well
+  if ci needs to update to supprot go latest version, support it
