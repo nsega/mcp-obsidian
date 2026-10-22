@@ -12,8 +12,11 @@ GO_FMT=$(GO_CMD) fmt
 # Tool versions. This is the single source of truth for the golangci-lint pin:
 # CI reads it via `make print-golangci-lint-version`. No leading "v" - it is compared
 # with sort -V against `golangci-lint version --short`, which prints no prefix.
-# golangci-lint cannot lint a module targeting a newer Go than it was built with, so
-# raising the go directive in go.mod may require raising this too.
+# golangci-lint embeds golang.org/x/tools' export-data reader, so any Go release (patch
+# releases included) that changes the export data format needs a golangci-lint built
+# against a newer x/tools; the symptom is spurious typecheck errors. Raising the go
+# directive in go.mod may therefore require raising this too (go1.27.3 needed 2.15.0;
+# 2.13.x failed on it).
 GO_VERSION=$(shell sed -n 's/^go //p' go.mod)
 GOLANGCI_LINT_VERSION=2.15.0
 
@@ -99,7 +102,7 @@ lint:
 		case "$$installed" in \
 			''|*[!0-9.]*) \
 				echo "Could not read a version number from 'golangci-lint version --short' (got: '$$installed')."; \
-				echo "This module needs golangci-lint $(GOLANGCI_LINT_VERSION) or newer, built with Go $(GO_VERSION) or newer."; \
+				echo "This module needs golangci-lint $(GOLANGCI_LINT_VERSION) or newer (older releases may not read the export data written by $$(go env GOVERSION))."; \
 				echo "Check your install: https://golangci-lint.run/docs/welcome/install/"; \
 				exit 1; \
 				;; \
@@ -107,7 +110,7 @@ lint:
 		oldest=$$(printf '%s\n%s\n' "$(GOLANGCI_LINT_VERSION)" "$$installed" | sort -V | head -1); \
 		if [ "$$oldest" != "$(GOLANGCI_LINT_VERSION)" ]; then \
 			echo "golangci-lint $$installed is older than the pinned $(GOLANGCI_LINT_VERSION). Releases that old may not read the"; \
-			echo "export data written by the Go $(GO_VERSION) toolchain, which surfaces as spurious typecheck errors."; \
+			echo "export data written by your Go toolchain ($$(go env GOVERSION)), which surfaces as spurious typecheck errors."; \
 			echo "Upgrade to $(GOLANGCI_LINT_VERSION) or newer: https://golangci-lint.run/docs/welcome/install/"; \
 			exit 1; \
 		fi; \

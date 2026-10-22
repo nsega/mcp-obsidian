@@ -6,7 +6,7 @@
 
 A Model Context Protocol (MCP) server for managing Markdown notes in Obsidian vaults with full Zettelkasten workflow support.
 
-This is a Go rewrite inspired by [mcp-obsidian](https://github.com/smithery-ai/mcp-obsidian) using the [MCP Go SDK v1.6](https://github.com/modelcontextprotocol/go-sdk).
+This is a Go rewrite inspired by [mcp-obsidian](https://github.com/smithery-ai/mcp-obsidian) using the [MCP Go SDK v1.8.0](https://github.com/modelcontextprotocol/go-sdk).
 
 ## Features
 
@@ -275,8 +275,8 @@ internal/
 
 ### Prerequisites
 
-- Go 1.27.3 or later
-- [golangci-lint](https://golangci-lint.run/docs/welcome/install/) 2.15.0 or later (for linting; releases older than the pin may not read the export data written by the Go toolchain in go.mod, which surfaces as spurious typecheck errors; 2.13.x fails this way under go1.27.3)
+- Go 1.27.3 or later (the `go` directive in `go.mod` is authoritative)
+- [golangci-lint](https://golangci-lint.run/docs/welcome/install/) 2.15.0 or later (for linting; `make lint` enforces the Makefile pin, and older releases may not read the export data written by the Go toolchain you run: 2.13.x fails under go1.27.3 with spurious typecheck errors, while 2.14.0 happens to work)
 
 ### Build
 
