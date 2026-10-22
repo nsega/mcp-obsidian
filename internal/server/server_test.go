@@ -19,11 +19,27 @@ import (
 	"github.com/nsega/mcp-obsidian/internal/vault"
 )
 
-// testTimeout bounds every session and call in this package so a stalled
-// transport fails the test instead of hanging until the go test deadline. It
-// is sized for a CPU-bound 18 MiB decode under -race on a slow runner and must
-// stay below the per-package timeout in the Makefile's test target.
-const testTimeout = 90 * time.Second
+// maxCallTimeout is the longest a session or call in this package may take; it
+// is sized for a CPU-bound 18 MiB decode under -race on a slow runner.
+const maxCallTimeout = 90 * time.Second
+
+// callTimeout bounds every session and call so a stalled transport fails the
+// test instead of hanging. It stays under the go test deadline (the Makefile's
+// per-package -timeout, or the default) by a margin, so a stall surfaces as a
+// context error rather than a test-binary panic.
+func callTimeout(t *testing.T) time.Duration {
+	t.Helper()
+	timeout := maxCallTimeout
+	if deadline, ok := t.Deadline(); ok {
+		if left := time.Until(deadline) - 5*time.Second; left < timeout {
+			timeout = left
+		}
+	}
+	if timeout <= 0 {
+		t.Fatalf("not enough time left before the test deadline (%v)", timeout)
+	}
+	return timeout
+}
 
 // newTestSession builds a server over a fresh temporary vault, connects it to a
 // client over the given transport pair, and returns both sessions together with
@@ -70,7 +86,7 @@ func newTestSession(t *testing.T, ctx context.Context, serverTransport, clientTr
 // verifies the server exposes exactly the expected tool set
 func TestNewRegistersAllTools(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), callTimeout(t))
 	defer cancel()
 
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
@@ -133,7 +149,7 @@ func pipeTransports(t *testing.T, maxLineLength int) (serverTransport, clientTra
 			}
 		}
 	})
-	deadline := time.Now().Add(testTimeout)
+	deadline := time.Now().Add(callTimeout(t))
 	for _, f := range files {
 		if dlErr := f.SetDeadline(deadline); dlErr != nil {
 			if errors.Is(dlErr, os.ErrNoDeadline) {
@@ -180,7 +196,7 @@ func TestLargeNoteFitsFrameCap(t *testing.T) {
 		t.Fatalf("escaped test body (%d bytes) does not exceed mcp.DefaultMaxLineLength (%d); the test would not exercise the cap", 2*len(content), mcp.DefaultMaxLineLength)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), callTimeout(t))
 	defer cancel()
 	serverTransport, clientTransport := pipeTransports(t, server.MaxFrameSize)
 	clientSession, _, tmpVault := newTestSession(t, ctx, serverTransport, clientTransport)
@@ -208,10 +224,16 @@ func TestFrameCapEndsSession(t *testing.T) {
 	const frameCap = 4 << 10 // large enough for the initialize handshake
 	content := strings.Repeat("x", 2*frameCap)
 
-	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), callTimeout(t))
 	defer cancel()
 	serverTransport, clientTransport := pipeTransports(t, frameCap)
 	clientSession, serverSession, tmpVault := newTestSession(t, ctx, serverTransport, clientTransport)
+
+	// The handshake and a small call must fit under the cap, so a failure below
+	// is attributable to the oversized frame and not to the cap being too small.
+	if _, err := clientSession.ListTools(ctx, nil); err != nil {
+		t.Fatalf("a small call did not fit under a %d byte cap: %v", frameCap, err)
+	}
 
 	if _, err := updateNote1(ctx, clientSession, tmpVault, content); err == nil {
 		t.Fatal("expected the frame to be rejected under a cap smaller than the request")

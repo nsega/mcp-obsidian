@@ -19,21 +19,23 @@ import (
 const MaxArgumentsSize = 6*vault.MaxContentSize + 1<<20
 
 // MaxFrameSize bounds a single inbound JSON-RPC frame on the stdio transport:
-// MaxArgumentsSize plus headroom for the rest of the request (method, id, tool
-// name, _meta, whitespace). Any tools/call whose arguments pass the middleware
-// therefore fits on its own; only a request carrying more than that headroom
-// outside the arguments can still trip the cap, in which case the SDK ends the
-// session, and with it the process, which is what keeps memory per frame
-// bounded. Changing the cap, or disabling it with a negative
+// MaxArgumentsSize plus 4 MiB of headroom for the rest of the request (method,
+// id, tool name, _meta, whitespace). Any tools/call whose arguments pass the
+// middleware therefore fits on its own; only a request carrying more than that
+// headroom outside the arguments can still trip the cap, in which case the SDK
+// ends the session, and with it the process, which is what keeps memory per
+// frame bounded. Changing the cap, or disabling it with a negative
 // StdioTransport.MaxLineLength, is a code change in main.go.
-const MaxFrameSize = MaxArgumentsSize + 1<<20
+const MaxFrameSize = MaxArgumentsSize + 4<<20
 
 // limitArguments returns a receiving middleware that answers a tools/call whose
 // raw arguments exceed limit bytes with a tool error, before any handler runs.
 func limitArguments(limit int) mcp.Middleware {
 	return func(next mcp.MethodHandler) mcp.MethodHandler {
 		return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
-			if call, ok := req.(*mcp.CallToolRequest); ok && method == "tools/call" && len(call.Params.Arguments) > limit {
+			// The SDK builds a CallToolRequest only for tools/call, so the type
+			// assertion is the whole check.
+			if call, ok := req.(*mcp.CallToolRequest); ok && len(call.Params.Arguments) > limit {
 				return &mcp.CallToolResult{
 					IsError: true,
 					Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("arguments too large: %d bytes exceeds limit of %d", len(call.Params.Arguments), limit)}},
