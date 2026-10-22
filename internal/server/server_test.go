@@ -2,10 +2,11 @@ package server_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
-	"net"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -20,8 +21,9 @@ import (
 )
 
 // testTimeout bounds every session and call in this package so a stalled
-// transport fails the test instead of hanging until the go test deadline.
-const testTimeout = 30 * time.Second
+// transport fails the test instead of hanging until the go test deadline. It
+// must stay well below the per-package timeout in the Makefile's test target.
+const testTimeout = 20 * time.Second
 
 // newTestSession builds a server over a fresh temporary vault, connects it to a
 // client over the given transport pair, and returns the client session together
@@ -128,23 +130,31 @@ func TestLargeNoteFitsFrameCap(t *testing.T) {
 		t.Fatalf("escaped test body (%d bytes) does not exceed mcp.DefaultMaxLineLength (%d); the test would not exercise the cap", 2*len(content), mcp.DefaultMaxLineLength)
 	}
 
-	// call runs update_note with the body over a pipe whose server side applies
-	// maxLineLength, then checks the session is still usable. Deadlines on both
-	// pipe ends make a stalled frame fail instead of blocking the synchronous pipe.
+	// call runs update_note with the body over a pair of OS pipes (kernel buffered,
+	// so the 18 MiB frame does not pay a goroutine handoff per read) whose server
+	// side applies maxLineLength, then checks the session is still usable. Deadlines
+	// on every pipe end make a stalled frame fail instead of blocking forever.
 	call := func(t *testing.T, maxLineLength int) (*mcp.CallToolResult, error) {
 		t.Helper()
 		ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 		defer cancel()
 
-		serverConn, clientConn := net.Pipe()
+		serverReader, clientWriter, err := os.Pipe() // client -> server
+		if err != nil {
+			t.Fatalf("os.Pipe failed: %v", err)
+		}
+		clientReader, serverWriter, err := os.Pipe() // server -> client
+		if err != nil {
+			t.Fatalf("os.Pipe failed: %v", err)
+		}
 		deadline := time.Now().Add(testTimeout)
-		for _, c := range []net.Conn{serverConn, clientConn} {
-			if err := c.SetDeadline(deadline); err != nil {
-				t.Fatalf("SetDeadline failed: %v", err)
+		for _, f := range []*os.File{serverReader, clientWriter, clientReader, serverWriter} {
+			if dlErr := f.SetDeadline(deadline); dlErr != nil {
+				t.Fatalf("SetDeadline failed: %v", dlErr)
 			}
 		}
-		serverTransport := &mcp.IOTransport{Reader: serverConn, Writer: serverConn, MaxLineLength: maxLineLength}
-		clientTransport := &mcp.IOTransport{Reader: clientConn, Writer: clientConn}
+		serverTransport := &mcp.IOTransport{Reader: serverReader, Writer: serverWriter, MaxLineLength: maxLineLength}
+		clientTransport := &mcp.IOTransport{Reader: clientReader, Writer: clientWriter}
 		clientSession, tmpVault := newTestSession(t, ctx, serverTransport, clientTransport)
 
 		res, err := clientSession.CallTool(ctx, &mcp.CallToolParams{
@@ -175,8 +185,14 @@ func TestLargeNoteFitsFrameCap(t *testing.T) {
 	})
 
 	t.Run("SDK default cap ends the session", func(t *testing.T) {
-		if _, err := call(t, mcp.DefaultMaxLineLength); err == nil {
+		_, err := call(t, mcp.DefaultMaxLineLength)
+		if err == nil {
 			t.Fatal("expected the SDK default cap to reject the frame; otherwise the positive case does not exercise server.MaxFrameSize")
+		}
+		// A deadline would also produce an error; only a torn-down connection
+		// proves the cap fired.
+		if errors.Is(err, context.DeadlineExceeded) || os.IsTimeout(err) {
+			t.Fatalf("control hit a timeout rather than the cap: %v", err)
 		}
 	})
 }
