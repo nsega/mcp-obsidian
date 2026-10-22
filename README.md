@@ -288,7 +288,8 @@ make build-all      # Cross-compile for linux/darwin/windows (amd64/arm64)
 ### Test
 
 ```bash
-make test           # Run all tests with race detector
+make test           # Run tests with race detector (-short: skips the large-frame transport test)
+make test-full      # Run all tests, including the large-frame transport test (what CI runs)
 make coverage       # Run tests with HTML coverage report
 ```
 
@@ -298,6 +299,10 @@ make coverage       # Run tests with HTML coverage report
 make lint           # Run golangci-lint
 make check          # Run fmt + vet + lint + test
 ```
+
+### Request size limits
+
+Note content is limited to 10 MiB per call (`vault.MaxContentSize`) and the JSON-encoded arguments of any tool call to about 61 MiB (`server.MaxArgumentsSize`); both are answered with a tool error. The stdio transport additionally caps a single inbound JSON-RPC frame at about 65 MiB (`server.MaxFrameSize`, the arguments bound plus headroom). A frame beyond that is not decodable, so the server ends the session and exits with `server error` and `max_frame_bytes` in the log; the limit exists to bound memory per frame and is a constant in `internal/server`.
 
 ### Run
 

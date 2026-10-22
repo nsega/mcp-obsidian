@@ -19,14 +19,15 @@ import (
 // over the limit gets a tool error instead of reaching a handler.
 const MaxArgumentsSize = 6*vault.MaxContentSize + 1<<20
 
-// MaxFrameSize bounds a single inbound JSON-RPC frame on the stdio transport:
-// MaxArgumentsSize plus 4 MiB of headroom for the rest of the request (method,
-// id, tool name, _meta, whitespace). Any tools/call whose arguments pass the
-// middleware therefore fits on its own; only a request carrying more than that
-// headroom outside the arguments can still trip the cap, in which case the SDK
-// ends the session, and with it the process, which is what keeps memory per
-// frame bounded. Changing the cap, or disabling it with a negative
-// StdioTransport.MaxLineLength, is a code change in main.go.
+// MaxFrameSize bounds a single inbound JSON-RPC frame on the stdio transport.
+// The transport decodes frames up to this size and ends the session (and with
+// it the process) on anything larger, regardless of the middleware, which only
+// runs on requests that were decoded. It is MaxArgumentsSize plus 4 MiB of
+// headroom for the rest of the request (method, id, tool name, _meta,
+// whitespace), so every tools/call the middleware lets through, and the
+// oversized ones it answers with a tool error, is decodable unless more than
+// that headroom sits outside the arguments. Changing the cap, or disabling it
+// with a negative StdioTransport.MaxLineLength, is a code change in main.go.
 const MaxFrameSize = MaxArgumentsSize + 4<<20
 
 // limitArguments returns a receiving middleware that answers a tools/call whose
@@ -49,13 +50,19 @@ func limitArguments(limit int) mcp.Middleware {
 
 // New creates a configured MCP server with all tools registered
 func New(h *handler.Handler, version string, logger *slog.Logger) *mcp.Server {
+	return newWithLimit(h, version, logger, MaxArgumentsSize)
+}
+
+// newWithLimit is New with the tools/call arguments bound injectable, so a test
+// can prove the middleware is wired without sending MaxArgumentsSize bytes.
+func newWithLimit(h *handler.Handler, version string, logger *slog.Logger, argumentsLimit int) *mcp.Server {
 	srv := mcp.NewServer(&mcp.Implementation{
 		Name:    "mcp-obsidian",
 		Version: version,
 	}, &mcp.ServerOptions{
 		Logger: logger,
 	})
-	srv.AddReceivingMiddleware(limitArguments(MaxArgumentsSize))
+	srv.AddReceivingMiddleware(limitArguments(argumentsLimit))
 
 	// Register search_notes tool
 	mcp.AddTool(srv, &mcp.Tool{
