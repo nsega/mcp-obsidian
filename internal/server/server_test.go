@@ -130,10 +130,10 @@ func TestLargeNoteFitsFrameCap(t *testing.T) {
 		t.Fatalf("escaped test body (%d bytes) does not exceed mcp.DefaultMaxLineLength (%d); the test would not exercise the cap", 2*len(content), mcp.DefaultMaxLineLength)
 	}
 
-	// call runs update_note with the body over a pair of OS pipes (kernel buffered,
-	// so the 18 MiB frame does not pay a goroutine handoff per read) whose server
-	// side applies maxLineLength, then checks the session is still usable. Deadlines
-	// on every pipe end make a stalled frame fail instead of blocking forever.
+	// call runs update_note with the body over a pair of OS pipes whose server side
+	// applies maxLineLength, then checks the session is still usable. Deadlines on
+	// every pipe end make a stalled frame fail instead of blocking forever. Most of
+	// the test's time under -race is the SDK decoding the 18 MiB frame, not the pipes.
 	call := func(t *testing.T, maxLineLength int) (*mcp.CallToolResult, error) {
 		t.Helper()
 		ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
