@@ -276,7 +276,7 @@ internal/
 ### Prerequisites
 
 - Go 1.27.3 or later
-- [golangci-lint](https://golangci-lint.run/docs/welcome/install/) 2.13.2 or later (for linting; it must be built with Go >= the go directive in go.mod)
+- [golangci-lint](https://golangci-lint.run/docs/welcome/install/) 2.15.0 or later (for linting; releases older than the pin may not read the export data written by the Go toolchain in go.mod, which surfaces as spurious typecheck errors; 2.13.x fails this way under go1.27.3)
 
 ### Build
 

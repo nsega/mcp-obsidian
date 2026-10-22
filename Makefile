@@ -106,8 +106,8 @@ lint:
 		esac; \
 		oldest=$$(printf '%s\n%s\n' "$(GOLANGCI_LINT_VERSION)" "$$installed" | sort -V | head -1); \
 		if [ "$$oldest" != "$(GOLANGCI_LINT_VERSION)" ]; then \
-			echo "golangci-lint $$installed is too old. It is built with an older Go than the $(GO_VERSION)"; \
-			echo "this module targets, so it will refuse to load the config."; \
+			echo "golangci-lint $$installed is older than the pinned $(GOLANGCI_LINT_VERSION). Releases that old may not read the"; \
+			echo "export data written by the Go $(GO_VERSION) toolchain, which surfaces as spurious typecheck errors."; \
 			echo "Upgrade to $(GOLANGCI_LINT_VERSION) or newer: https://golangci-lint.run/docs/welcome/install/"; \
 			exit 1; \
 		fi; \
