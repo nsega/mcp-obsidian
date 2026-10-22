@@ -16,15 +16,17 @@ GO_FMT=$(GO_CMD) fmt
 # Why the pin moves with the go directive (canonical explanation; the workflow and
 # README point here):
 #  - golangci-lint refuses a module whose language version (major.minor) is newer than
-#    the Go it was built with.
+#    the Go it was built with: "can't load config: the Go language version (goX) used
+#    to build golangci-lint is lower than the targeted Go version (Y)".
 #  - golangci-lint and staticcheck embed golang.org/x/tools' export-data reader, so a Go
 #    release that changes the export data format needs tools built against a newer
 #    x/tools, even across patch releases. go1.27.2 moved to export data version 5:
 #    staticcheck fails with "export data version 5 is greater than maximum supported
 #    version 4", golangci-lint with spurious typecheck errors. golangci-lint 2.13.x
-#    fails, 2.14.0 is the verified floor, and the pin tracks the current release.
-#    make lint requires at least the pin (CI runs exactly the pin; a newer local
-#    release may lint differently).
+#    fails on it (2.14.0 happened to work when tested). The pin tracks the current
+#    release; make lint requires at least the pin, not the oldest release that
+#    works, so local and CI stay on the same line (CI runs exactly the pin; a newer
+#    local release may lint differently).
 GOLANGCI_LINT_VERSION=2.15.0
 
 # Build parameters
@@ -117,8 +119,8 @@ lint:
 		oldest=$$(printf '%s\n%s\n' "$(GOLANGCI_LINT_VERSION)" "$$installed" | sort -V | head -1); \
 		if [ "$$oldest" != "$(GOLANGCI_LINT_VERSION)" ]; then \
 			echo "golangci-lint $$installed is older than the pinned $(GOLANGCI_LINT_VERSION), which CI runs; install at least that version."; \
-			echo "Releases below the verified floor also fail on $$($(GO_CMD) env GOVERSION) export data or its language-version check"; \
-			echo "(see the comment above GOLANGCI_LINT_VERSION in the Makefile)."; \
+			echo "Releases older than the pin may also fail the toolchain export-data read ($$($(GO_CMD) env GOVERSION); go1.27.2 and later"; \
+			echo "write version 5) or golangci-lint's own language-version check; see the comment above GOLANGCI_LINT_VERSION."; \
 			echo "Upgrade to $(GOLANGCI_LINT_VERSION) or newer: https://golangci-lint.run/docs/welcome/install/"; \
 			exit 1; \
 		fi; \
