@@ -23,7 +23,8 @@ GO_FMT=$(GO_CMD) fmt
 #    staticcheck fails with "export data version 5 is greater than maximum supported
 #    version 4", golangci-lint with spurious typecheck errors. golangci-lint 2.13.x
 #    fails, 2.14.0 is the verified floor, and the pin tracks the current release.
-#    make lint enforces the pin, not the floor, so local and CI lint match.
+#    make lint requires at least the pin (CI runs exactly the pin; a newer local
+#    release may lint differently).
 GOLANGCI_LINT_VERSION=2.15.0
 
 # Build parameters
@@ -115,7 +116,7 @@ lint:
 		esac; \
 		oldest=$$(printf '%s\n%s\n' "$(GOLANGCI_LINT_VERSION)" "$$installed" | sort -V | head -1); \
 		if [ "$$oldest" != "$(GOLANGCI_LINT_VERSION)" ]; then \
-			echo "golangci-lint $$installed is older than the pinned $(GOLANGCI_LINT_VERSION), which CI uses; upgrade so local and CI lint match."; \
+			echo "golangci-lint $$installed is older than the pinned $(GOLANGCI_LINT_VERSION), which CI runs; install at least that version."; \
 			echo "Releases below the verified floor also fail on $$($(GO_CMD) env GOVERSION) export data or its language-version check"; \
 			echo "(see the comment above GOLANGCI_LINT_VERSION in the Makefile)."; \
 			echo "Upgrade to $(GOLANGCI_LINT_VERSION) or newer: https://golangci-lint.run/docs/welcome/install/"; \

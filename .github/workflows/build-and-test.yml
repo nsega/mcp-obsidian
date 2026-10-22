@@ -85,8 +85,8 @@ jobs:
         go-version-file: go.mod
 
     # The Makefile owns this pin so `make lint` and CI cannot drift apart.
-    # Its floor is tied to the go directive: see the comment above GOLANGCI_LINT_VERSION in
-    # the Makefile. Bump it with the go directive.
+    # Its floor is tied to the Go toolchain and the go directive: see the comment above
+    # GOLANGCI_LINT_VERSION in the Makefile. Bump it with the go directive.
     - name: Resolve pinned golangci-lint version
       id: tools
       run: echo "golangci_lint=v$(make -s print-golangci-lint-version)" >> "$GITHUB_OUTPUT"

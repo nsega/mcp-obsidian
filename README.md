@@ -276,7 +276,7 @@ internal/
 ### Prerequisites
 
 - Go 1.27.3 or later (the `go` directive in `go.mod` is authoritative)
-- [golangci-lint](https://golangci-lint.run/docs/welcome/install/) 2.15.0 or later (for linting; the version CI uses, enforced by `make lint` so local and CI lint match; the comment above `GOLANGCI_LINT_VERSION` in the `Makefile` explains why the pin moves with the Go version)
+- [golangci-lint](https://golangci-lint.run/docs/welcome/install/) 2.15.0 or later (for linting; CI runs exactly the `GOLANGCI_LINT_VERSION` pin in the `Makefile` and `make lint` checks you have at least it; the comment above the pin explains why it moves with the Go version)
 
 ### Build
 
