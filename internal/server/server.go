@@ -19,10 +19,12 @@ import (
 // over the limit gets a tool error instead of reaching a handler.
 const MaxArgumentsSize = 6*vault.MaxContentSize + 1<<20
 
-// MaxFrameSize bounds a single inbound JSON-RPC frame on the stdio transport.
-// The transport decodes frames up to this size and ends the session (and with
-// it the process) on anything larger, regardless of the middleware, which only
-// runs on requests that were decoded. It is MaxArgumentsSize plus 4 MiB of
+// MaxFrameSize bounds a single inbound JSON-RPC frame on the stdio transport,
+// approximately: the SDK counts bytes read from the pipe, so read-ahead from a
+// pipelined next frame (up to the pipe buffer) is not charged. The transport
+// decodes frames up to this size and ends the session (and with it the process)
+// on anything larger, regardless of the middleware, which only runs on requests
+// that were decoded. It is MaxArgumentsSize plus 4 MiB of
 // headroom for the rest of the request (method, id, tool name, _meta,
 // whitespace), so every tools/call the middleware lets through, and the
 // oversized ones it answers with a tool error, is decodable unless more than

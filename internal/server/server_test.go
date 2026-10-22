@@ -46,6 +46,13 @@ func callTimeout(t *testing.T) time.Duration {
 // the vault path. The sessions and the vault are released via t.Cleanup.
 func newTestSession(t *testing.T, ctx context.Context, serverTransport, clientTransport mcp.Transport) (*mcp.ClientSession, *mcp.ServerSession, string) {
 	t.Helper()
+	return newTestSessionWithLimit(t, ctx, serverTransport, clientTransport, server.MaxArgumentsSize)
+}
+
+// newTestSessionWithLimit is newTestSession with the tools/call arguments bound
+// injectable, so a test can exercise the limit without MaxArgumentsSize bytes.
+func newTestSessionWithLimit(t *testing.T, ctx context.Context, serverTransport, clientTransport mcp.Transport, argumentsLimit int) (*mcp.ClientSession, *mcp.ServerSession, string) {
+	t.Helper()
 
 	tmpVault := testutil.SetupTestVault(t)
 	t.Cleanup(func() { testutil.CleanupTestVault(t, tmpVault) })
@@ -56,7 +63,7 @@ func newTestSession(t *testing.T, ctx context.Context, serverTransport, clientTr
 	}
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	srv := server.New(handler.New(v, logger), "test", logger)
+	srv := server.NewWithLimit(handler.New(v, logger), "test", logger, argumentsLimit)
 
 	serverSession, err := srv.Connect(ctx, serverTransport, nil)
 	if err != nil {
@@ -251,4 +258,37 @@ func TestFrameCapEndsSession(t *testing.T) {
 		t.Fatalf("server session ended on a timeout rather than the cap: %v", err)
 	}
 	t.Logf("server session ended with: %v", err)
+}
+
+// TestNewWiresLimitArguments connects a real client to a server built by the
+// constructor New delegates to, with a tiny arguments bound, and checks an
+// over-limit tools/call comes back as a tool error while the session stays up.
+func TestNewWiresLimitArguments(t *testing.T) {
+	t.Parallel()
+	const limit = 64
+	ctx, cancel := context.WithTimeout(context.Background(), callTimeout(t))
+	defer cancel()
+
+	serverTransport, clientTransport := mcp.NewInMemoryTransports()
+	clientSession, _, _ := newTestSessionWithLimit(t, ctx, serverTransport, clientTransport, limit)
+
+	res, err := clientSession.CallTool(ctx, &mcp.CallToolParams{
+		Name:      "search_notes",
+		Arguments: map[string]any{"query": strings.Repeat("x", 2*limit)},
+	})
+	if err != nil {
+		t.Fatalf("over-limit call failed at the protocol level instead of as a tool error: %v", err)
+	}
+	if !res.IsError {
+		t.Fatalf("over-limit call was not rejected: %#v", res)
+	}
+	if len(res.Content) != 1 {
+		t.Fatalf("expected one content item in the tool error, got %#v", res.Content)
+	}
+	if text, ok := res.Content[0].(*mcp.TextContent); !ok || !strings.Contains(text.Text, "arguments too large") {
+		t.Fatalf("unexpected tool error content: %#v", res.Content)
+	}
+	if _, err := clientSession.ListTools(ctx, nil); err != nil {
+		t.Fatalf("session unusable after the rejected call: %v", err)
+	}
 }

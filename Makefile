@@ -82,7 +82,7 @@ test:
 	@echo "Running tests (short; make test-full runs the large-frame test too)..."
 	@$(GO_TEST) -v -race -short -timeout 60s ./...
 
-## test-full: Run all tests including the large-frame transport test (what CI runs)
+## test-full: Run all tests including the large-frame transport test (CI runs the full suite too)
 test-full:
 	@echo "Running all tests..."
 	@$(GO_TEST) -v -race -timeout 120s ./...
