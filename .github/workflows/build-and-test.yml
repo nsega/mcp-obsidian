@@ -11,7 +11,8 @@ env:
   # GOTOOLCHAIN=local, so an upstream go directive above ours would fail the build.
   # Its floor is tied to the Go toolchain: staticcheck embeds golang.org/x/tools' export-data
   # reader, and a Go release that changes the export data format (go1.27.3 did, to version 5)
-  # needs a staticcheck built against a newer x/tools. Bump both together.
+  # needs a staticcheck built against a newer x/tools; the symptom is "export data version N
+  # is greater than maximum supported version M". Bump both together.
   STATICCHECK_VERSION: v0.8.2
 
 jobs:
@@ -87,8 +88,10 @@ jobs:
 
     # The Makefile owns this pin so `make lint` and CI cannot drift apart.
     # golangci-lint's floor is tied to the Go toolchain for the same export-data reason as
-    # STATICCHECK_VERSION above (under go1.27.3, 2.13.x fails and 2.14.0 is the verified
-    # floor; the pin tracks the current release), so bump it with the go directive.
+    # STATICCHECK_VERSION above (surfacing as spurious typecheck errors; under go1.27.3,
+    # 2.13.x fails and 2.14.0 is the verified floor; the pin tracks the current release),
+    # and it also refuses a module whose language version is newer than the Go it was
+    # built with, so bump it with the go directive.
     - name: Resolve pinned golangci-lint version
       id: tools
       run: echo "golangci_lint=v$(make -s print-golangci-lint-version)" >> "$GITHUB_OUTPUT"

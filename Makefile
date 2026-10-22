@@ -12,12 +12,13 @@ GO_FMT=$(GO_CMD) fmt
 # Tool versions. This is the single source of truth for the golangci-lint pin:
 # CI reads it via `make print-golangci-lint-version`. No leading "v" - it is compared
 # with sort -V against `golangci-lint version --short`, which prints no prefix.
-# golangci-lint embeds golang.org/x/tools' export-data reader, so any Go release (patch
-# releases included) that changes the export data format needs a golangci-lint built
-# against a newer x/tools; the symptom is spurious typecheck errors. Raising the go
-# directive in go.mod may therefore require raising this too. Under go1.27.3, 2.13.x
-# fails and 2.14.0 is the verified floor; the pin tracks the current release and
-# make lint enforces the pin.
+# Two things tie this pin to the go directive in go.mod. golangci-lint refuses a module
+# whose language version (major.minor) is newer than the Go it was built with. And it
+# embeds golang.org/x/tools' export-data reader, so even a patch release that changes
+# the export data format needs a golangci-lint built against a newer x/tools; that one
+# surfaces as spurious typecheck errors. Raising the go directive may therefore require
+# raising this too. Under go1.27.3, 2.13.x fails and 2.14.0 is the verified floor; the
+# pin tracks the current release and make lint enforces the pin.
 GOLANGCI_LINT_VERSION=2.15.0
 
 # Build parameters
