@@ -9,8 +9,8 @@ on:
 env:
   # staticcheck must be pinned rather than @latest: setup-go v6+ exports
   # GOTOOLCHAIN=local, so an upstream go directive above ours would fail the build.
-  # Its floor is tied to the Go toolchain (x/tools export-data reader; go1.27.2 moved to
-  # version 5): see the comment above GOLANGCI_LINT_VERSION in the Makefile. Bump both together.
+  # Its floor is tied to the Go toolchain: see the comment above GOLANGCI_LINT_VERSION in
+  # the Makefile. Bump both together.
   STATICCHECK_VERSION: v0.8.2
 
 jobs:

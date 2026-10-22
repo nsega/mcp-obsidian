@@ -119,8 +119,8 @@ lint:
 		oldest=$$(printf '%s\n%s\n' "$(GOLANGCI_LINT_VERSION)" "$$installed" | sort -V | head -1); \
 		if [ "$$oldest" != "$(GOLANGCI_LINT_VERSION)" ]; then \
 			echo "golangci-lint $$installed is older than the pinned $(GOLANGCI_LINT_VERSION), which CI runs; install at least that version."; \
-			echo "Releases older than the pin may also fail to read the export data your toolchain writes ($$($(GO_CMD) env GOVERSION); version 5 since go1.27.2)"; \
-			echo "or golangci-lint's own language-version check; see the comment above GOLANGCI_LINT_VERSION in the Makefile."; \
+			echo "Releases older than the pin may also fail to read the export data your toolchain ($$($(GO_CMD) env GOVERSION)) writes, or"; \
+			echo "golangci-lint's own language-version check; see the comment above GOLANGCI_LINT_VERSION in the Makefile."; \
 			echo "Upgrade to $(GOLANGCI_LINT_VERSION) or newer: https://golangci-lint.run/docs/welcome/install/"; \
 			exit 1; \
 		fi; \
