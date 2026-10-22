@@ -87,7 +87,8 @@ jobs:
 
     # The Makefile owns this pin so `make lint` and CI cannot drift apart.
     # golangci-lint's floor is tied to the Go toolchain for the same export-data reason as
-    # STATICCHECK_VERSION above (go1.27.3 needed 2.15.0), so bump it with the go directive.
+    # STATICCHECK_VERSION above (under go1.27.3, 2.13.x fails and 2.14.0 is the verified
+    # floor; the pin tracks the current release), so bump it with the go directive.
     - name: Resolve pinned golangci-lint version
       id: tools
       run: echo "golangci_lint=v$(make -s print-golangci-lint-version)" >> "$GITHUB_OUTPUT"

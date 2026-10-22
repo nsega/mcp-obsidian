@@ -37,10 +37,11 @@ func main() {
 
 	logger.Info("server starting", "vault", v.Path, "version", Version)
 
-	// go-sdk v1.8.0 caps inbound JSON-RPC frames at mcp.DefaultMaxLineLength (16 MiB) and
-	// ends the session on overflow. Kept deliberately: no legitimate call to this server
-	// approaches that size, and the cap bounds memory per frame.
-	if err := srv.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
+	// go-sdk v1.8.0 caps inbound JSON-RPC frames and ends the session on overflow. The
+	// SDK default (16 MiB) is smaller than an escaped note body the handlers accept, so
+	// the cap is sized by server.MaxFrameSize instead (see its doc for the escape hatch).
+	transport := &mcp.StdioTransport{MaxLineLength: server.MaxFrameSize}
+	if err := srv.Run(context.Background(), transport); err != nil {
 		logger.Error("server error", "error", err)
 		os.Exit(1)
 	}
