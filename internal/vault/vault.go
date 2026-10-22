@@ -17,6 +17,12 @@ const MaxReadPaths = 100
 // MaxContentSize limits the size of note content to prevent memory/disk exhaustion (10 MB)
 const MaxContentSize = 10 * 1024 * 1024
 
+// MaxMetadataSize limits the combined size of every string input other than note
+// content (titles, paths, queries, tags, prefixes) in a single tool call, so that
+// every request a handler accepts fits under the stdio frame cap after JSON escaping
+// (see server.MaxFrameSize)
+const MaxMetadataSize = 64 * 1024
+
 // Vault represents an Obsidian vault directory with path validation
 type Vault struct {
 	Path string // resolved absolute path to the vault root

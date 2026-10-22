@@ -9,17 +9,17 @@ import (
 )
 
 // MaxFrameSize bounds a single inbound JSON-RPC frame on the stdio transport.
-// Note content is capped at vault.MaxContentSize before it is written, but JSON
-// escaping can expand it up to six times (control characters become \u00XX), so
-// the frame cap is sized to admit any content the handlers would accept, plus
-// headroom for the rest of the request. Content up to vault.MaxContentSize
-// therefore never trips the cap on its own, and content above it gets the
-// handlers' "content too large" tool error. The other string fields (path, title,
-// tags) are not bounded by the handlers and share the headroom; a frame beyond
-// MaxFrameSize still ends the session, and with it the process, which is what
-// keeps memory per frame bounded. Changing the cap, or disabling it with a
-// negative StdioTransport.MaxLineLength, is a code change in main.go.
-const MaxFrameSize = 6*vault.MaxContentSize + 1<<20
+// The handlers accept at most vault.MaxContentSize of note content and
+// vault.MaxMetadataSize of other string inputs per call, and JSON escaping can
+// expand a string up to six times (control characters become \u00XX), so the cap
+// is six times both limits plus headroom for the request envelope. Every request
+// a handler would accept therefore fits, and an oversized one gets the handlers'
+// "content too large" or "metadata too large" tool error instead of the SDK
+// ending the session. A frame beyond MaxFrameSize still ends the session, and
+// with it the process, which is what keeps memory per frame bounded. Changing the
+// cap, or disabling it with a negative StdioTransport.MaxLineLength, is a code
+// change in main.go.
+const MaxFrameSize = 6*(vault.MaxContentSize+vault.MaxMetadataSize) + 1<<20
 
 // New creates a configured MCP server with all tools registered
 func New(h *handler.Handler, version string, logger *slog.Logger) *mcp.Server {

@@ -46,6 +46,20 @@ func textResult(text string) *mcp.CallToolResult {
 // pruning, the .md filter, and per-file permission checks, so tool handlers
 // only implement their per-file logic. Errors returned by fn, including
 // filepath.SkipAll for result limits, propagate to the walk.
+// checkMetadataSize rejects a call whose non-content string inputs together
+// exceed vault.MaxMetadataSize, so every request a handler accepts fits under
+// the transport frame cap (see server.MaxFrameSize)
+func checkMetadataSize(parts ...string) error {
+	total := 0
+	for _, p := range parts {
+		total += len(p)
+	}
+	if total > vault.MaxMetadataSize {
+		return fmt.Errorf("metadata too large: %d bytes exceeds limit of %d", total, vault.MaxMetadataSize)
+	}
+	return nil
+}
+
 func (h *Handler) walkMarkdownFiles(ctx context.Context, fn func(path string) error) error {
 	return filepath.WalkDir(h.vault.Path, func(path string, d fs.DirEntry, err error) error {
 		if ctx.Err() != nil {
@@ -83,6 +97,10 @@ func (h *Handler) walkMarkdownFiles(ctx context.Context, fn func(path string) er
 
 // SearchNotes implements the search_notes tool
 func (h *Handler) SearchNotes(ctx context.Context, req *mcp.CallToolRequest, input note.SearchNotesInput) (*mcp.CallToolResult, note.SearchNotesOutput, error) {
+	if err := checkMetadataSize(input.Query); err != nil {
+		return nil, note.SearchNotesOutput{}, err
+	}
+
 	var results []string
 
 	// Use case-insensitive literal matching via regexp.QuoteMeta to prevent
@@ -117,6 +135,10 @@ func (h *Handler) SearchNotes(ctx context.Context, req *mcp.CallToolRequest, inp
 
 // ReadNotes implements the read_notes tool
 func (h *Handler) ReadNotes(ctx context.Context, req *mcp.CallToolRequest, input note.ReadNotesInput) (*mcp.CallToolResult, note.ReadNotesOutput, error) {
+	if err := checkMetadataSize(input.Paths...); err != nil {
+		return nil, note.ReadNotesOutput{}, err
+	}
+
 	if len(input.Paths) > vault.MaxReadPaths {
 		return nil, note.ReadNotesOutput{}, fmt.Errorf("too many paths: %d exceeds limit of %d", len(input.Paths), vault.MaxReadPaths)
 	}
@@ -177,6 +199,10 @@ func (h *Handler) ReadNotes(ctx context.Context, req *mcp.CallToolRequest, input
 
 // CreateNote implements the create_note tool
 func (h *Handler) CreateNote(ctx context.Context, req *mcp.CallToolRequest, input note.CreateNoteInput) (*mcp.CallToolResult, note.CreateNoteOutput, error) {
+	if err := checkMetadataSize(append([]string{input.Title, input.Folder}, input.Tags...)...); err != nil {
+		return nil, note.CreateNoteOutput{}, err
+	}
+
 	if input.Title == "" {
 		return nil, note.CreateNoteOutput{}, fmt.Errorf("title is required")
 	}
@@ -248,6 +274,10 @@ func (h *Handler) CreateNote(ctx context.Context, req *mcp.CallToolRequest, inpu
 
 // UpdateNote implements the update_note tool
 func (h *Handler) UpdateNote(ctx context.Context, req *mcp.CallToolRequest, input note.UpdateNoteInput) (*mcp.CallToolResult, note.UpdateNoteOutput, error) {
+	if err := checkMetadataSize(input.Path, input.Mode); err != nil {
+		return nil, note.UpdateNoteOutput{}, err
+	}
+
 	if len(input.Content) > vault.MaxContentSize {
 		return nil, note.UpdateNoteOutput{}, fmt.Errorf("content too large: %d bytes exceeds limit of %d", len(input.Content), vault.MaxContentSize)
 	}
@@ -299,6 +329,10 @@ func (h *Handler) UpdateNote(ctx context.Context, req *mcp.CallToolRequest, inpu
 
 // DeleteNote implements the delete_note tool
 func (h *Handler) DeleteNote(ctx context.Context, req *mcp.CallToolRequest, input note.DeleteNoteInput) (*mcp.CallToolResult, note.DeleteNoteOutput, error) {
+	if err := checkMetadataSize(input.Path); err != nil {
+		return nil, note.DeleteNoteOutput{}, err
+	}
+
 	if !strings.HasSuffix(strings.ToLower(input.Path), ".md") {
 		return nil, note.DeleteNoteOutput{}, fmt.Errorf("can only delete .md files")
 	}
@@ -332,6 +366,10 @@ func (h *Handler) DeleteNote(ctx context.Context, req *mcp.CallToolRequest, inpu
 
 // SearchContent implements the search_content tool
 func (h *Handler) SearchContent(ctx context.Context, req *mcp.CallToolRequest, input note.SearchContentInput) (*mcp.CallToolResult, note.SearchContentOutput, error) {
+	if err := checkMetadataSize(input.Query); err != nil {
+		return nil, note.SearchContentOutput{}, err
+	}
+
 	// Use case-insensitive literal matching via regexp.QuoteMeta to prevent
 	// regex injection from user-provided queries
 	re := regexp.MustCompile("(?i)" + regexp.QuoteMeta(input.Query))
@@ -380,6 +418,10 @@ func (h *Handler) SearchContent(ctx context.Context, req *mcp.CallToolRequest, i
 
 // GetBacklinks implements the get_backlinks tool
 func (h *Handler) GetBacklinks(ctx context.Context, req *mcp.CallToolRequest, input note.GetBacklinksInput) (*mcp.CallToolResult, note.GetBacklinksOutput, error) {
+	if err := checkMetadataSize(input.NoteName); err != nil {
+		return nil, note.GetBacklinksOutput{}, err
+	}
+
 	if input.NoteName == "" {
 		return nil, note.GetBacklinksOutput{}, fmt.Errorf("note_name is required")
 	}
@@ -440,6 +482,10 @@ func (h *Handler) GetBacklinks(ctx context.Context, req *mcp.CallToolRequest, in
 
 // ListTags implements the list_tags tool
 func (h *Handler) ListTags(ctx context.Context, req *mcp.CallToolRequest, input note.ListTagsInput) (*mcp.CallToolResult, note.ListTagsOutput, error) {
+	if err := checkMetadataSize(input.Prefix); err != nil {
+		return nil, note.ListTagsOutput{}, err
+	}
+
 	tagCounts := make(map[string]int)
 
 	// Regex for inline #tags (not inside code blocks)
