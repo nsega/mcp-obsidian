@@ -13,8 +13,9 @@ import (
 // MaxArgumentsSize bounds the raw, JSON-encoded arguments of a tools/call
 // request. It is enforced by a receiving middleware for every tool, current and
 // future, and sized so that the largest note content the handlers accept still
-// fits after JSON escaping (vault.MaxContentSize can expand up to six times, as
-// control characters become \u00XX) with room for the other arguments. A call
+// fits after JSON escaping (vault.MaxContentSize can expand up to six times:
+// control characters, the HTML-safe set < > &, and invalid UTF-8 bytes each
+// become a six-byte \uXXXX sequence) with room for the other arguments. A call
 // over the limit gets a tool error instead of reaching a handler.
 const MaxArgumentsSize = 6*vault.MaxContentSize + 1<<20
 

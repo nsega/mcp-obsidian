@@ -41,7 +41,9 @@ func main() {
 	// handlers accept, so the cap is sized by server.MaxFrameSize (see its doc).
 	transport := &mcp.StdioTransport{MaxLineLength: server.MaxFrameSize}
 	if err := srv.Run(context.Background(), transport); err != nil {
-		logger.Error("server error", "error", err)
+		// max_frame_bytes lets an inbound frame overflow be told apart from any
+		// other transport failure.
+		logger.Error("server error", "error", err, "max_frame_bytes", server.MaxFrameSize)
 		os.Exit(1)
 	}
 }

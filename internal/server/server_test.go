@@ -127,9 +127,9 @@ func TestNewRegistersAllTools(t *testing.T) {
 
 // pipeTransports returns a server and client transport joined by two OS pipes,
 // with the given inbound frame cap on the server side. Every pipe end carries
-// a deadline so a stalled frame fails instead of blocking forever; platforms
+// the deadline so a stalled frame fails instead of blocking forever; platforms
 // whose anonymous pipes cannot take deadlines (Windows) skip the test.
-func pipeTransports(t *testing.T, maxLineLength int) (serverTransport, clientTransport mcp.Transport) {
+func pipeTransports(t *testing.T, maxLineLength int, deadline time.Time) (serverTransport, clientTransport mcp.Transport) {
 	t.Helper()
 
 	serverReader, clientWriter, err := os.Pipe() // client -> server
@@ -149,7 +149,6 @@ func pipeTransports(t *testing.T, maxLineLength int) (serverTransport, clientTra
 			}
 		}
 	})
-	deadline := time.Now().Add(callTimeout(t))
 	for _, f := range files {
 		if dlErr := f.SetDeadline(deadline); dlErr != nil {
 			if errors.Is(dlErr, os.ErrNoDeadline) {
@@ -196,9 +195,10 @@ func TestLargeNoteFitsFrameCap(t *testing.T) {
 		t.Fatalf("escaped test body (%d bytes) does not exceed mcp.DefaultMaxLineLength (%d); the test would not exercise the cap", 2*len(content), mcp.DefaultMaxLineLength)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), callTimeout(t))
+	deadline := time.Now().Add(callTimeout(t))
+	ctx, cancel := context.WithDeadline(context.Background(), deadline)
 	defer cancel()
-	serverTransport, clientTransport := pipeTransports(t, server.MaxFrameSize)
+	serverTransport, clientTransport := pipeTransports(t, server.MaxFrameSize, deadline)
 	clientSession, _, tmpVault := newTestSession(t, ctx, serverTransport, clientTransport)
 
 	// Most of this call's time under -race is the SDK decoding the frame.
@@ -216,17 +216,18 @@ func TestLargeNoteFitsFrameCap(t *testing.T) {
 
 // TestFrameCapEndsSession proves the mechanism the cap guards against: a frame
 // over the server's MaxLineLength is not answered, the server session ends
-// with the SDK's frame error, and the client loses the connection. A small cap
-// and body show this in milliseconds.
+// with an error, and the client loses the connection. A small cap and body
+// show this in milliseconds.
 func TestFrameCapEndsSession(t *testing.T) {
 	t.Parallel()
 
 	const frameCap = 4 << 10 // large enough for the initialize handshake
 	content := strings.Repeat("x", 2*frameCap)
 
-	ctx, cancel := context.WithTimeout(context.Background(), callTimeout(t))
+	deadline := time.Now().Add(callTimeout(t))
+	ctx, cancel := context.WithDeadline(context.Background(), deadline)
 	defer cancel()
-	serverTransport, clientTransport := pipeTransports(t, frameCap)
+	serverTransport, clientTransport := pipeTransports(t, frameCap, deadline)
 	clientSession, serverSession, tmpVault := newTestSession(t, ctx, serverTransport, clientTransport)
 
 	// The handshake and a small call must fit under the cap, so a failure below
@@ -239,9 +240,15 @@ func TestFrameCapEndsSession(t *testing.T) {
 		t.Fatal("expected the frame to be rejected under a cap smaller than the request")
 	}
 
-	// Asserting on the SDK's own message means a pipe or context deadline
-	// (which would surface as a different error) cannot pass for the cap firing.
-	if err := serverSession.Wait(); err == nil || !strings.Contains(err.Error(), "maximum line length") {
-		t.Fatalf("server session did not end with the SDK frame-cap error: %v", err)
+	// The SDK exports no sentinel for the frame error and its wording is not
+	// stable, so assert the stable facts: the server session ended with an error
+	// that is neither a clean EOF nor a deadline, and log the message.
+	err := serverSession.Wait()
+	if err == nil || errors.Is(err, io.EOF) {
+		t.Fatalf("server session did not end with an error after the oversized frame: %v", err)
 	}
+	if errors.Is(err, context.DeadlineExceeded) || os.IsTimeout(err) {
+		t.Fatalf("server session ended on a timeout rather than the cap: %v", err)
+	}
+	t.Logf("server session ended with: %v", err)
 }

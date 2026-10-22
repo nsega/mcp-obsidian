@@ -79,8 +79,13 @@ clean:
 
 ## test: Run tests
 test:
-	@echo "Running tests..."
-	@$(GO_TEST) -v -race -timeout 60s ./...
+	@echo "Running tests (short; make test-full runs the large-frame test too)..."
+	@$(GO_TEST) -v -race -short -timeout 60s ./...
+
+## test-full: Run all tests including the large-frame transport test (what CI runs)
+test-full:
+	@echo "Running all tests..."
+	@$(GO_TEST) -v -race -timeout 120s ./...
 
 ## coverage: Run tests with coverage
 coverage:
