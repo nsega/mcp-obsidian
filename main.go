@@ -37,8 +37,13 @@ func main() {
 
 	logger.Info("server starting", "vault", v.Path, "version", Version)
 
-	if err := srv.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
-		logger.Error("server error", "error", err)
+	// The SDK's default inbound frame cap is smaller than an escaped note body the
+	// handlers accept, so the cap is sized by server.MaxFrameSize (see its doc).
+	transport := &mcp.StdioTransport{MaxLineLength: server.MaxFrameSize}
+	if err := srv.Run(context.Background(), transport); err != nil {
+		// max_frame_bytes records the configured inbound frame cap for context; the
+		// SDK exports no sentinel to single out an overflow.
+		logger.Error("server error", "error", err, "max_frame_bytes", server.MaxFrameSize)
 		os.Exit(1)
 	}
 }

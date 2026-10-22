@@ -6,7 +6,7 @@
 
 A Model Context Protocol (MCP) server for managing Markdown notes in Obsidian vaults with full Zettelkasten workflow support.
 
-This is a Go rewrite inspired by [mcp-obsidian](https://github.com/smithery-ai/mcp-obsidian) using the [MCP Go SDK v1.6](https://github.com/modelcontextprotocol/go-sdk).
+This is a Go rewrite inspired by [mcp-obsidian](https://github.com/smithery-ai/mcp-obsidian) using the [MCP Go SDK v1.8.0](https://github.com/modelcontextprotocol/go-sdk).
 
 ## Features
 
@@ -275,8 +275,8 @@ internal/
 
 ### Prerequisites
 
-- Go 1.27.1 or later
-- [golangci-lint](https://golangci-lint.run/docs/welcome/install/) 2.13.2 or later (for linting; it must be built with Go >= the go directive in go.mod)
+- Go 1.27.3 or later (the `go` directive in `go.mod` is authoritative)
+- [golangci-lint](https://golangci-lint.run/docs/welcome/install/) 2.15.0 or later (for linting; CI runs exactly the `GOLANGCI_LINT_VERSION` pin in the `Makefile` and `make lint` checks you have at least it; the comment above the pin explains why it moves with the Go version)
 
 ### Build
 
@@ -288,7 +288,8 @@ make build-all      # Cross-compile for linux/darwin/windows (amd64/arm64)
 ### Test
 
 ```bash
-make test           # Run all tests with race detector
+make test           # Run tests with race detector (-short: skips the large-frame transport test)
+make test-full      # Run all tests, including the large-frame transport test (CI runs the full suite too)
 make coverage       # Run tests with HTML coverage report
 ```
 
@@ -298,6 +299,10 @@ make coverage       # Run tests with HTML coverage report
 make lint           # Run golangci-lint
 make check          # Run fmt + vet + lint + test
 ```
+
+### Request size limits
+
+Note content is limited to 10 MiB per call (`vault.MaxContentSize`) and the JSON-encoded arguments of any tool call to about 61 MiB (`server.MaxArgumentsSize`); both are answered with a tool error. The stdio transport additionally caps a single inbound JSON-RPC frame at about 65 MiB (`server.MaxFrameSize`, the arguments bound plus headroom; approximate, since the SDK does not charge read-ahead from a pipelined next frame). A frame beyond that is not decodable, so the server ends the session and exits with `server error` and `max_frame_bytes` in the log; the limit exists to bound memory per frame and is a constant in `internal/server`.
 
 ### Run
 

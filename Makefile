@@ -12,10 +12,22 @@ GO_FMT=$(GO_CMD) fmt
 # Tool versions. This is the single source of truth for the golangci-lint pin:
 # CI reads it via `make print-golangci-lint-version`. No leading "v" - it is compared
 # with sort -V against `golangci-lint version --short`, which prints no prefix.
-# golangci-lint cannot lint a module targeting a newer Go than it was built with, so
-# raising the go directive in go.mod may require raising this too.
-GO_VERSION=$(shell sed -n 's/^go //p' go.mod)
-GOLANGCI_LINT_VERSION=2.13.2
+#
+# Why the pin moves with the go directive (canonical explanation; the workflow and
+# README point here):
+#  - golangci-lint refuses a module whose language version (major.minor) is newer than
+#    the Go it was built with: "can't load config: the Go language version (goX) used
+#    to build golangci-lint is lower than the targeted Go version (Y)".
+#  - golangci-lint and staticcheck embed golang.org/x/tools' export-data reader, so a Go
+#    release that changes the export data format needs tools built against a newer
+#    x/tools, even across patch releases. go1.27.2 moved to export data version 5:
+#    staticcheck fails with "export data version 5 is greater than maximum supported
+#    version 4", golangci-lint with spurious typecheck errors. golangci-lint 2.13.x
+#    fails on it (2.14.0 happened to work when tested). The pin tracks the current
+#    release; make lint requires at least the pin, not the oldest release that
+#    works, so local and CI stay on the same line (CI runs exactly the pin; a newer
+#    local release may lint differently).
+GOLANGCI_LINT_VERSION=2.15.0
 
 # Build parameters
 VERSION?=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
@@ -67,8 +79,13 @@ clean:
 
 ## test: Run tests
 test:
-	@echo "Running tests..."
-	@$(GO_TEST) -v -race -timeout 30s ./...
+	@echo "Running tests (short; make test-full runs the large-frame test too)..."
+	@$(GO_TEST) -v -race -short -timeout 60s ./...
+
+## test-full: Run all tests including the large-frame transport test (CI runs the full suite too)
+test-full:
+	@echo "Running all tests..."
+	@$(GO_TEST) -v -race -timeout 120s ./...
 
 ## coverage: Run tests with coverage
 coverage:
@@ -99,15 +116,16 @@ lint:
 		case "$$installed" in \
 			''|*[!0-9.]*) \
 				echo "Could not read a version number from 'golangci-lint version --short' (got: '$$installed')."; \
-				echo "This module needs golangci-lint $(GOLANGCI_LINT_VERSION) or newer, built with Go $(GO_VERSION) or newer."; \
+				echo "This module needs golangci-lint $(GOLANGCI_LINT_VERSION) or newer, the version CI uses (the comment above GOLANGCI_LINT_VERSION in the Makefile explains why)."; \
 				echo "Check your install: https://golangci-lint.run/docs/welcome/install/"; \
 				exit 1; \
 				;; \
 		esac; \
 		oldest=$$(printf '%s\n%s\n' "$(GOLANGCI_LINT_VERSION)" "$$installed" | sort -V | head -1); \
 		if [ "$$oldest" != "$(GOLANGCI_LINT_VERSION)" ]; then \
-			echo "golangci-lint $$installed is too old. It is built with an older Go than the $(GO_VERSION)"; \
-			echo "this module targets, so it will refuse to load the config."; \
+			echo "golangci-lint $$installed is older than the pinned $(GOLANGCI_LINT_VERSION), which CI runs; install at least that version."; \
+			echo "Releases older than the pin may also fail to read the export data your toolchain ($$($(GO_CMD) env GOVERSION)) writes,"; \
+			echo "or may fail golangci-lint's own language-version check; see the comment above GOLANGCI_LINT_VERSION in the Makefile."; \
 			echo "Upgrade to $(GOLANGCI_LINT_VERSION) or newer: https://golangci-lint.run/docs/welcome/install/"; \
 			exit 1; \
 		fi; \
