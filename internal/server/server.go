@@ -12,10 +12,11 @@ import (
 // Note content is capped at vault.MaxContentSize before it is written, but JSON
 // escaping can expand a body up to six times (control characters become \u00XX),
 // so the frame cap is sized to admit any body the handlers would accept, plus
-// headroom for the request envelope. An oversized note is then answered with the
-// handlers' "content too large" tool error instead of the SDK ending the session,
-// while the cap still bounds memory per frame. Pass it as StdioTransport.MaxLineLength
-// (a negative value there disables the cap entirely).
+// headroom for the request envelope. Bodies up to vault.MaxContentSize therefore
+// never trip the cap, and a body above it gets the handlers' "content too large"
+// tool error; a frame beyond MaxFrameSize still ends the session, which is what
+// keeps memory per frame bounded. Pass it as StdioTransport.MaxLineLength (a
+// negative value there disables the cap entirely).
 const MaxFrameSize = 6*vault.MaxContentSize + 1<<20
 
 // New creates a configured MCP server with all tools registered
