@@ -124,8 +124,17 @@ func pipeTransports(t *testing.T, maxLineLength int) (serverTransport, clientTra
 	if err != nil {
 		t.Fatalf("os.Pipe failed: %v", err)
 	}
+	files := []*os.File{serverReader, clientWriter, clientReader, serverWriter}
+	t.Cleanup(func() {
+		for _, f := range files {
+			// On the normal path the SDK has already closed them.
+			if closeErr := f.Close(); closeErr != nil && !errors.Is(closeErr, os.ErrClosed) {
+				t.Logf("pipe close: %v", closeErr)
+			}
+		}
+	})
 	deadline := time.Now().Add(testTimeout)
-	for _, f := range []*os.File{serverReader, clientWriter, clientReader, serverWriter} {
+	for _, f := range files {
 		if dlErr := f.SetDeadline(deadline); dlErr != nil {
 			if errors.Is(dlErr, os.ErrNoDeadline) {
 				t.Skipf("anonymous pipes do not support deadlines on this platform: %v", dlErr)
@@ -192,28 +201,25 @@ func TestLargeNoteFitsFrameCap(t *testing.T) {
 // TestFrameCapEndsSession proves the mechanism the cap guards against: a frame
 // over the server's MaxLineLength is not answered, the server session ends
 // with the SDK's frame error, and the client loses the connection. A small cap
-// and body show this in milliseconds; the error is asserted on the server side
-// so a pipe or context deadline cannot pass for the cap firing.
+// and body show this in milliseconds.
 func TestFrameCapEndsSession(t *testing.T) {
 	t.Parallel()
 
-	const cap = 4 << 10 // large enough for the initialize handshake
-	content := strings.Repeat("x", 2*cap)
+	const frameCap = 4 << 10 // large enough for the initialize handshake
+	content := strings.Repeat("x", 2*frameCap)
 
 	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
-	serverTransport, clientTransport := pipeTransports(t, cap)
+	serverTransport, clientTransport := pipeTransports(t, frameCap)
 	clientSession, serverSession, tmpVault := newTestSession(t, ctx, serverTransport, clientTransport)
 
 	if _, err := updateNote1(ctx, clientSession, tmpVault, content); err == nil {
 		t.Fatal("expected the frame to be rejected under a cap smaller than the request")
 	}
 
-	err := serverSession.Wait()
-	if err == nil || !strings.Contains(err.Error(), "maximum line length") {
+	// Asserting on the SDK's own message means a pipe or context deadline
+	// (which would surface as a different error) cannot pass for the cap firing.
+	if err := serverSession.Wait(); err == nil || !strings.Contains(err.Error(), "maximum line length") {
 		t.Fatalf("server session did not end with the SDK frame-cap error: %v", err)
-	}
-	if errors.Is(err, context.DeadlineExceeded) || os.IsTimeout(err) {
-		t.Fatalf("server session ended on a timeout rather than the cap: %v", err)
 	}
 }

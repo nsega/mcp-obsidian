@@ -1,6 +1,8 @@
 package server
 
 import (
+	"context"
+	"fmt"
 	"log/slog"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -8,18 +10,39 @@ import (
 	"github.com/nsega/mcp-obsidian/internal/vault"
 )
 
-// MaxFrameSize bounds a single inbound JSON-RPC frame on the stdio transport.
-// The handlers accept at most vault.MaxContentSize of note content and
-// vault.MaxMetadataSize of other string inputs per call, and JSON escaping can
-// expand a string up to six times (control characters become \u00XX), so the cap
-// is six times both limits plus headroom for the request envelope. Every request
-// a handler would accept therefore fits, and an oversized one gets the handlers'
-// "content too large" or "metadata too large" tool error instead of the SDK
-// ending the session. A frame beyond MaxFrameSize still ends the session, and
-// with it the process, which is what keeps memory per frame bounded. Changing the
-// cap, or disabling it with a negative StdioTransport.MaxLineLength, is a code
-// change in main.go.
-const MaxFrameSize = 6*(vault.MaxContentSize+vault.MaxMetadataSize) + 1<<20
+// MaxArgumentsSize bounds the raw, JSON-encoded arguments of a tools/call
+// request. It is enforced by a receiving middleware for every tool, current and
+// future, and sized so that the largest note content the handlers accept still
+// fits after JSON escaping (vault.MaxContentSize can expand up to six times, as
+// control characters become \u00XX) with room for the other arguments. A call
+// over the limit gets a tool error instead of reaching a handler.
+const MaxArgumentsSize = 6*vault.MaxContentSize + 1<<20
+
+// MaxFrameSize bounds a single inbound JSON-RPC frame on the stdio transport:
+// MaxArgumentsSize plus headroom for the rest of the request (method, id, tool
+// name, _meta, whitespace). Any tools/call whose arguments pass the middleware
+// therefore fits on its own; only a request carrying more than that headroom
+// outside the arguments can still trip the cap, in which case the SDK ends the
+// session, and with it the process, which is what keeps memory per frame
+// bounded. Changing the cap, or disabling it with a negative
+// StdioTransport.MaxLineLength, is a code change in main.go.
+const MaxFrameSize = MaxArgumentsSize + 1<<20
+
+// limitArguments returns a receiving middleware that answers a tools/call whose
+// raw arguments exceed limit bytes with a tool error, before any handler runs.
+func limitArguments(limit int) mcp.Middleware {
+	return func(next mcp.MethodHandler) mcp.MethodHandler {
+		return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
+			if call, ok := req.(*mcp.CallToolRequest); ok && method == "tools/call" && len(call.Params.Arguments) > limit {
+				return &mcp.CallToolResult{
+					IsError: true,
+					Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("arguments too large: %d bytes exceeds limit of %d", len(call.Params.Arguments), limit)}},
+				}, nil
+			}
+			return next(ctx, method, req)
+		}
+	}
+}
 
 // New creates a configured MCP server with all tools registered
 func New(h *handler.Handler, version string, logger *slog.Logger) *mcp.Server {
@@ -29,6 +52,7 @@ func New(h *handler.Handler, version string, logger *slog.Logger) *mcp.Server {
 	}, &mcp.ServerOptions{
 		Logger: logger,
 	})
+	srv.AddReceivingMiddleware(limitArguments(MaxArgumentsSize))
 
 	// Register search_notes tool
 	mcp.AddTool(srv, &mcp.Tool{
