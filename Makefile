@@ -15,7 +15,7 @@ GO_FMT=$(GO_CMD) fmt
 # golangci-lint cannot lint a module targeting a newer Go than it was built with, so
 # raising the go directive in go.mod may require raising this too.
 GO_VERSION=$(shell sed -n 's/^go //p' go.mod)
-GOLANGCI_LINT_VERSION=2.13.2
+GOLANGCI_LINT_VERSION=2.15.0
 
 # Build parameters
 VERSION?=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")

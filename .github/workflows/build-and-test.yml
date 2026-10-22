@@ -10,7 +10,7 @@ env:
   # staticcheck must be pinned rather than @latest: setup-go v6+ exports
   # GOTOOLCHAIN=local, so an upstream go directive above ours would fail the build.
   # Its floor is tied to the go directive in go.mod - bump both together.
-  STATICCHECK_VERSION: v0.8.1
+  STATICCHECK_VERSION: v0.8.2
 
 jobs:
   test:
