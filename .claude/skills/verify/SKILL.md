@@ -7,6 +7,7 @@ description: Drive the mcp-obsidian stdio MCP server end-to-end against a scratc
 
 Build: `make build` → `build/mcp-obsidian` (or `go build -o <out> .`).
 Run: `build/mcp-obsidian <vault-path>`; speaks newline-delimited JSON-RPC on stdio, INFO logs on stderr.
+Static checks: `make check` runs fmt, vet, `make lint`, `make staticcheck` and the short tests. The two linter targets install the versions pinned in the `Makefile` into `bin/` (needs the Go module proxy on first run) and fail if they can't, so a pass always means both linters ran; don't substitute a linter from `PATH`.
 
 ## Drive a session
 

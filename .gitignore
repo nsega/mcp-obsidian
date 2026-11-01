@@ -13,6 +13,9 @@ mcp-obsidian
 build/
 dist/
 
+# Pinned linters installed by make lint / make staticcheck
+/bin/
+
 # Test binary, built with `go test -c`
 *.test
 

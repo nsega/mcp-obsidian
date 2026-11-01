@@ -276,7 +276,7 @@ internal/
 ### Prerequisites
 
 - Go 1.27.3 or later (the `go` directive in `go.mod` is authoritative)
-- [golangci-lint](https://golangci-lint.run/docs/welcome/install/) 2.15.0 or later (for linting; CI runs exactly the `GOLANGCI_LINT_VERSION` pin in the `Makefile` and `make lint` checks you have at least it; the comment above the pin explains why it moves with the Go version)
+- Network access to the Go module proxy the first time you lint: you do not install golangci-lint or staticcheck yourself. `make lint` and `make staticcheck` build the versions pinned in the `Makefile` into a git-ignored `bin/` and run those, and CI runs the same targets (the comment above the pins explains why they move with the Go version)
 
 ### Build
 
@@ -296,9 +296,12 @@ make coverage       # Run tests with HTML coverage report
 ### Lint
 
 ```bash
-make lint           # Run golangci-lint
-make check          # Run fmt + vet + lint + test
+make lint           # Run the pinned golangci-lint
+make staticcheck    # Run the pinned staticcheck
+make check          # Run fmt + vet + lint + staticcheck + test
 ```
+
+If a pinned linter cannot be installed (for example, no network), `make lint`, `make staticcheck` and `make check` fail rather than skip it.
 
 ### Request size limits
 
