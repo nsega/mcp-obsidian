@@ -9,11 +9,11 @@ GO_MOD=$(GO_CMD) mod
 GO_VET=$(GO_CMD) vet
 GO_FMT=$(GO_CMD) fmt
 
-# Tool versions. This is the single source of truth for the golangci-lint pin:
-# CI reads it via `make print-golangci-lint-version`. No leading "v" - it is compared
-# with sort -V against `golangci-lint version --short`, which prints no prefix.
+# Linter versions. This is the only place these numbers live (no leading "v"):
+# `make lint` and `make staticcheck` install exactly these versions into bin/ and run
+# them from there, never whatever is on PATH, and CI runs the same targets.
 #
-# Why the pin moves with the go directive (canonical explanation; the workflow and
+# Why the pins move with the go directive (canonical explanation; the workflow and
 # README point here):
 #  - golangci-lint refuses a module whose language version (major.minor) is newer than
 #    the Go it was built with: "can't load config: the Go language version (goX) used
@@ -23,11 +23,19 @@ GO_FMT=$(GO_CMD) fmt
 #    x/tools, even across patch releases. go1.27.2 moved to export data version 5:
 #    staticcheck fails with "export data version 5 is greater than maximum supported
 #    version 4", golangci-lint with spurious typecheck errors. golangci-lint 2.13.x
-#    fails on it (2.14.0 happened to work when tested). The pin tracks the current
-#    release; make lint requires at least the pin, not the oldest release that
-#    works, so local and CI stay on the same line (CI runs exactly the pin; a newer
-#    local release may lint differently).
+#    fails on it (2.14.0 happened to work when tested). The pins track the current
+#    releases.
 GOLANGCI_LINT_VERSION=2.15.0
+STATICCHECK_VERSION=0.8.2
+
+# Pinned linters are built from source with the current Go toolchain, so the install
+# path carries both the tool version and the Go version: bumping either pin, or the
+# toolchain, selects a new path and the next run reinstalls. Remove bin/ to reclaim
+# space from old builds.
+TOOLS_GO_VERSION:=$(shell $(GO_CMD) env GOVERSION 2>/dev/null)
+TOOLS_DIR=bin
+GOLANGCI_LINT=$(TOOLS_DIR)/golangci-lint-v$(GOLANGCI_LINT_VERSION)-$(TOOLS_GO_VERSION)/golangci-lint
+STATICCHECK=$(TOOLS_DIR)/staticcheck-v$(STATICCHECK_VERSION)-$(TOOLS_GO_VERSION)/staticcheck
 
 # Build parameters
 VERSION?=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
@@ -38,7 +46,7 @@ LDFLAGS=-ldflags "-X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIME)"
 BUILD_DIR=build
 COVERAGE_DIR=coverage
 
-.PHONY: all build clean test lint fmt vet deps help install run check coverage tidy verify print-golangci-lint-version
+.PHONY: all build clean test lint staticcheck fmt vet deps help install run check coverage tidy verify
 
 # Default target
 all: check build
@@ -50,10 +58,11 @@ help:
 	@echo "  make clean        - Remove build artifacts"
 	@echo "  make test         - Run tests"
 	@echo "  make coverage     - Run tests with coverage report"
-	@echo "  make lint         - Run linters (golangci-lint)"
+	@echo "  make lint         - Run the pinned golangci-lint"
+	@echo "  make staticcheck  - Run the pinned staticcheck"
 	@echo "  make fmt          - Format code"
 	@echo "  make vet          - Run go vet"
-	@echo "  make check        - Run all checks (fmt, vet, lint, test)"
+	@echo "  make check        - Run all checks (fmt, vet, lint, staticcheck, test)"
 	@echo "  make deps         - Download dependencies"
 	@echo "  make tidy         - Tidy and verify dependencies"
 	@echo "  make verify       - Verify dependencies"
@@ -108,40 +117,34 @@ vet:
 	@$(GO_VET) ./...
 	@echo "go vet passed"
 
-## lint: Run golangci-lint
-lint:
-	@echo "Running linters..."
-	@if command -v golangci-lint >/dev/null 2>&1; then \
-		installed=$$(golangci-lint version --short 2>/dev/null); \
-		case "$$installed" in \
-			''|*[!0-9.]*) \
-				echo "Could not read a version number from 'golangci-lint version --short' (got: '$$installed')."; \
-				echo "This module needs golangci-lint $(GOLANGCI_LINT_VERSION) or newer, the version CI uses (the comment above GOLANGCI_LINT_VERSION in the Makefile explains why)."; \
-				echo "Check your install: https://golangci-lint.run/docs/welcome/install/"; \
-				exit 1; \
-				;; \
-		esac; \
-		oldest=$$(printf '%s\n%s\n' "$(GOLANGCI_LINT_VERSION)" "$$installed" | sort -V | head -1); \
-		if [ "$$oldest" != "$(GOLANGCI_LINT_VERSION)" ]; then \
-			echo "golangci-lint $$installed is older than the pinned $(GOLANGCI_LINT_VERSION), which CI runs; install at least that version."; \
-			echo "Releases older than the pin may also fail to read the export data your toolchain ($$($(GO_CMD) env GOVERSION)) writes,"; \
-			echo "or may fail golangci-lint's own language-version check; see the comment above GOLANGCI_LINT_VERSION in the Makefile."; \
-			echo "Upgrade to $(GOLANGCI_LINT_VERSION) or newer: https://golangci-lint.run/docs/welcome/install/"; \
-			exit 1; \
-		fi; \
-		golangci-lint run ./...; \
-	else \
-		echo "golangci-lint not installed. Install $(GOLANGCI_LINT_VERSION) or newer from https://golangci-lint.run/docs/welcome/install/"; \
-		echo "Running basic checks instead..."; \
-		$(MAKE) fmt vet; \
-	fi
+## lint: Run the pinned golangci-lint (installed into bin/ on first use)
+lint: $(GOLANGCI_LINT)
+	@echo "Running golangci-lint v$(GOLANGCI_LINT_VERSION)..."
+	@$(GOLANGCI_LINT) run ./...
 
-## print-golangci-lint-version: Print the pinned golangci-lint version (read by CI)
-print-golangci-lint-version:
-	@echo $(GOLANGCI_LINT_VERSION)
+## staticcheck: Run the pinned staticcheck (installed into bin/ on first use)
+staticcheck: $(STATICCHECK)
+	@echo "Running staticcheck v$(STATICCHECK_VERSION)..."
+	@$(STATICCHECK) ./...
 
-## check: Run all checks (fmt, vet, lint, test)
-check: fmt vet lint test
+# A failed install leaves no file at the target path, so the recipe exits non-zero and
+# the next run retries; a missing linter can never let `make check` pass.
+$(GOLANGCI_LINT):
+	@echo "Installing golangci-lint v$(GOLANGCI_LINT_VERSION) into $(@D)..."
+	@GOBIN="$(CURDIR)/$(@D)" $(GO_CMD) install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v$(GOLANGCI_LINT_VERSION) || { \
+		echo "Error: could not install golangci-lint v$(GOLANGCI_LINT_VERSION) with $(GO_CMD) install; make lint needs it (check network access to the Go module proxy)."; \
+		exit 1; \
+	}
+
+$(STATICCHECK):
+	@echo "Installing staticcheck v$(STATICCHECK_VERSION) into $(@D)..."
+	@GOBIN="$(CURDIR)/$(@D)" $(GO_CMD) install honnef.co/go/tools/cmd/staticcheck@v$(STATICCHECK_VERSION) || { \
+		echo "Error: could not install staticcheck v$(STATICCHECK_VERSION) with $(GO_CMD) install; make staticcheck needs it (check network access to the Go module proxy)."; \
+		exit 1; \
+	}
+
+## check: Run all checks (fmt, vet, lint, staticcheck, test)
+check: fmt vet lint staticcheck test
 	@echo "All checks passed!"
 
 ## deps: Download dependencies
